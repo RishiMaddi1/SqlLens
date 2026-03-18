@@ -5,7 +5,9 @@ interface FilterNodeData {
   conditions: string[];
 }
 
-export const FilterNode = memo(({ data }: NodeProps<FilterNodeData>) => {
+export const FilterNode = memo((props: NodeProps) => {
+  const data = props.data as unknown as FilterNodeData;
+
   return (
     <div
       className="
@@ -37,7 +39,7 @@ export const FilterNode = memo(({ data }: NodeProps<FilterNodeData>) => {
       <div className="px-4 py-3">
         {data.conditions.length > 0 ? (
           <ul className="space-y-2">
-            {data.conditions.map((condition, index) => (
+            {data.conditions.map((condition: string, index: number) => (
               <li
                 key={index}
                 className="text-amber-100/90 text-xs flex items-start gap-2 font-mono bg-amber-950/50 px-2 py-1.5 rounded"

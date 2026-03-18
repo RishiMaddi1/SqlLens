@@ -7,7 +7,8 @@ interface TableNodeData {
   filters?: string[];
 }
 
-export const TableNode = memo(({ data }: NodeProps<TableNodeData>) => {
+export const TableNode = memo((props: NodeProps) => {
+  const data = props.data as unknown as TableNodeData;
   const hasFilters = data.filters && data.filters.length > 0;
 
   return (
@@ -53,7 +54,7 @@ export const TableNode = memo(({ data }: NodeProps<TableNodeData>) => {
       <div className="px-4 py-3">
         {data.fields.length > 0 ? (
           <ul className="space-y-1.5">
-            {data.fields.map((field, index) => (
+            {data.fields.map((field: string, index: number) => (
               <li
                 key={index}
                 className="text-slate-400 text-xs flex items-center gap-2"
@@ -83,7 +84,7 @@ export const TableNode = memo(({ data }: NodeProps<TableNodeData>) => {
             </span>
           </div>
           <ul className="space-y-1">
-            {data.filters!.map((filter, index) => (
+            {data.filters!.map((filter: string, index: number) => (
               <li
                 key={index}
                 className="text-orange-100/80 text-[10px] font-mono bg-orange-950/50 px-2 py-1 rounded truncate"

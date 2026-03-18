@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import {
   ReactFlow,
@@ -36,7 +36,7 @@ function App() {
   const nodeTypes = {
     tableNode: TableNode,
     sortNode: SortNode,
-  };
+  } as any;  // TypeScript workaround for node type registration
 
   // Parse SQL and update flow (only triggered by button click)
   const parseAndUpdateFlow = useCallback((sqlText: string) => {

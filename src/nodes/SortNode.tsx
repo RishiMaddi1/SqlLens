@@ -5,7 +5,9 @@ interface SortNodeData {
   sortColumns: Array<{ column: string; direction: string }>;
 }
 
-export const SortNode = memo(({ data }: NodeProps<SortNodeData>) => {
+export const SortNode = memo((props: NodeProps) => {
+  const data = props.data as unknown as SortNodeData;
+
   return (
     <div
       className="
@@ -37,7 +39,7 @@ export const SortNode = memo(({ data }: NodeProps<SortNodeData>) => {
       <div className="px-4 py-3">
         {data.sortColumns.length > 0 ? (
           <ul className="space-y-2">
-            {data.sortColumns.map((sort, index) => (
+            {data.sortColumns.map((sort: { column: string; direction: string }, index: number) => (
               <li
                 key={index}
                 className="text-purple-100/90 text-xs flex items-center justify-between gap-2 font-mono bg-purple-950/50 px-2 py-1.5 rounded"

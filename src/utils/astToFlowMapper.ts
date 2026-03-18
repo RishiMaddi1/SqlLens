@@ -21,10 +21,8 @@ interface ASTColumn {
 // Type for ON condition
 interface OnCondition {
   type: string;
-  left?: ColumnRef;
-  right?: ColumnRef;
-  left?: any;
-  right?: any;
+  left?: ColumnRef | any;
+  right?: ColumnRef | any;
 }
 
 // Type for FROM item with potential JOIN
@@ -43,12 +41,6 @@ interface SelectAST {
   where?: any;
   orderby?: any;
   [key: string]: any;
-}
-
-// Result of parsing a WHERE condition
-interface ParsedCondition {
-  text: string;
-  table?: string;
 }
 
 /**
@@ -98,19 +90,19 @@ function extractTablesFromOnCondition(on: OnCondition): { leftTable?: string; ri
   let rightTable: string | undefined;
 
   if (on.left) {
-    if (on.left.type === 'column_ref' && on.left.table) {
-      leftTable = on.left.table;
-    } else if (on.left.type === 'binary_expr') {
-      const nested = extractTablesFromOnCondition(on.left);
+    if (on.left.type === 'column_ref' && (on.left as ColumnRef).table) {
+      leftTable = (on.left as ColumnRef).table;
+    } else if ((on.left as any).type === 'binary_expr') {
+      const nested = extractTablesFromOnCondition(on.left as any);
       leftTable = nested?.leftTable;
     }
   }
 
   if (on.right) {
-    if (on.right.type === 'column_ref' && on.right.table) {
-      rightTable = on.right.table;
-    } else if (on.right.type === 'binary_expr') {
-      const nested = extractTablesFromOnCondition(on.right);
+    if (on.right.type === 'column_ref' && (on.right as ColumnRef).table) {
+      rightTable = (on.right as ColumnRef).table;
+    } else if ((on.right as any).type === 'binary_expr') {
+      const nested = extractTablesFromOnCondition(on.right as any);
       rightTable = nested?.rightTable;
     }
   }
@@ -422,8 +414,7 @@ function extractOrderByColumns(ast: SelectAST): Array<{ column: string; directio
  * Extract tables, JOINs, and fields from the AST
  */
 export function extractTablesJoinsAndFields(
-  ast: SelectAST,
-  filtersByTable: Map<string, string[]>
+  ast: SelectAST
 ): {
   tables: Set<string>;
   joins: Array<{ from: string; to: string; type: string }>;
@@ -513,11 +504,13 @@ export function applyDagreLayout(
     let nodeWidth = 240;
 
     if (node.type === 'tableNode') {
-      const fieldCount = node.data.fields?.length || 0;
-      const filterCount = node.data.filters?.length || 0;
+      const data = node.data as { fields?: string[]; filters?: string[] };
+      const fieldCount = data.fields?.length || 0;
+      const filterCount = data.filters?.length || 0;
       nodeHeight = Math.max(100, 70 + fieldCount * 24 + filterCount * 28);
     } else if (node.type === 'sortNode') {
-      const sortCount = node.data.sortColumns?.length || 0;
+      const data = node.data as { sortColumns?: Array<{ column: string; direction: string }> };
+      const sortCount = data.sortColumns?.length || 0;
       nodeHeight = Math.max(80, 60 + sortCount * 28);
     }
 
@@ -565,7 +558,7 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
   const filtersByTable = extractWhereConditionsByTable(ast);
 
   // Extract tables, JOINs, and fields
-  const { tables, joins, fieldsByTable } = extractTablesJoinsAndFields(ast, filtersByTable);
+  const { tables, joins, fieldsByTable } = extractTablesJoinsAndFields(ast);
 
   // Handle wildcard (*)
   const hasWildcard = fieldsByTable.has('*');
