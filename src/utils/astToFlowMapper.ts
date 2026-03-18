@@ -85,11 +85,45 @@ function formatValue(value: any): string {
  */
 function formatCondition(condition: any): string {
   if (!condition) return '';
+
+  // Handle BETWEEN operator: { type: 'binary_expr', operator: 'BETWEEN', left: ..., right: { expr: [value1, value2] } }
+  if (condition.type === 'binary_expr' && condition.operator === 'BETWEEN') {
+    const left = formatValue(condition.left);
+    const rightExprs = condition.right?.expr;
+    if (Array.isArray(rightExprs) && rightExprs.length === 2) {
+      const val1 = formatValue(rightExprs[0]);
+      const val2 = formatValue(rightExprs[1]);
+      return `${left} BETWEEN ${val1} AND ${val2}`;
+    }
+  }
+
+  // Handle IN operator: { type: 'binary_expr', operator: 'IN', left: ..., right: { type: 'expr_list', value: [...] } }
+  if (condition.type === 'binary_expr' && condition.operator === 'IN') {
+    const left = formatValue(condition.left);
+    const rightValues = condition.right?.value;
+    if (Array.isArray(rightValues)) {
+      const inList = rightValues.map(v => formatValue(v)).filter(v => v).join(', ');
+      return `${left} IN (${inList})`;
+    }
+  }
+
+  // Handle NOT IN
+  if (condition.type === 'binary_expr' && condition.operator === 'NOT IN') {
+    const left = formatValue(condition.left);
+    const rightValues = condition.right?.value;
+    if (Array.isArray(rightValues)) {
+      const inList = rightValues.map(v => formatValue(v)).filter(v => v).join(', ');
+      return `${left} NOT IN (${inList})`;
+    }
+  }
+
+  // Handle regular binary expressions
   if (condition.type === 'binary_expr') {
     const left = formatValue(condition.left);
     const right = formatValue(condition.right);
     return `${left} ${condition.operator} ${right}`;
   }
+
   return formatValue(condition);
 }
 
@@ -386,12 +420,14 @@ function extractOrderBy(ast: SelectAST): Array<{ column: string; direction: stri
  */
 export function applyDagreLayout(
   nodes: Node[],
-  edges: Edge[]
+  edges: Edge[],
+  rankSep: number = 150,
+  nodeSep: number = 100
 ): { nodes: Node[]; edges: Edge[] } {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-  dagreGraph.setGraph({ rankdir: 'TB', nodesep: 100, ranksep: 150 });
+  dagreGraph.setGraph({ rankdir: 'TB', nodesep: nodeSep, ranksep: rankSep });
 
   nodes.forEach((node) => {
     let h = 100;
@@ -430,7 +466,13 @@ export function applyDagreLayout(
 /**
  * Main conversion function
  */
-export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
+export function sqlToFlowNodes(
+  sql: string,
+  edgeType: string = 'smoothstep',
+  showFilters: boolean = true,
+  rankSep: number = 150,
+  nodeSep: number = 100
+): { nodes: Node[]; edges: Edge[] } {
   console.log('========================================');
   console.log('SQL TO FLOW NODES');
   console.log('========================================');
@@ -493,7 +535,7 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
         tableName: table.name,
         alias: table.alias,
         fields: displayFields,
-        filters: table.filters,
+        filters: showFilters ? table.filters : [],
       },
       position: { x: 0, y: 0 },
     });
@@ -515,7 +557,7 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
       source: join.from,
       target: join.to,
       label: join.type,
-      type: 'smoothstep',
+      type: edgeType,
       animated: true,
       style: { stroke: '#60a5fa', strokeWidth: 2 },
       labelStyle: { fill: '#94a3b8', fontSize: 11 },
@@ -540,7 +582,7 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
         id: `edge-to-sort`,
         source: finalTableId,
         target: sortNodeId,
-        type: 'smoothstep',
+        type: edgeType,
         animated: true,
         style: { stroke: '#a855f7', strokeWidth: 2 },
         label: 'ORDER BY',
@@ -555,7 +597,7 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
   console.log('========================================');
 
   // Apply layout
-  const { nodes: layoutedNodes } = applyDagreLayout(allNodes, allEdges);
+  const { nodes: layoutedNodes } = applyDagreLayout(allNodes, allEdges, rankSep, nodeSep);
 
   return { nodes: layoutedNodes, edges: allEdges };
 }

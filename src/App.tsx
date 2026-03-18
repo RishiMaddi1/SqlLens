@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import {
   ReactFlow,
@@ -10,12 +10,17 @@ import {
   type Edge,
   useNodesState,
   useEdgesState,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { toPng } from 'html-to-image';
+import { Download, Columns3, SplitSquareHorizontal } from 'lucide-react';
 import { sqlToFlowNodes } from './utils/astToFlowMapper';
 import { TableNode } from './nodes/TableNode';
+import { CTENode } from './nodes/CTENode';
+import { SubqueryNode } from './nodes/SubqueryNode';
 import { SortNode } from './nodes/SortNode';
+import { SettingsSidebar } from './components/SettingsSidebar';
 
 // Default hardcoded query for the PoC
 const DEFAULT_QUERY =
@@ -29,20 +34,61 @@ function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  // Layout settings
+  const [rankSep, setRankSep] = useState(150);
+  const [nodeSep, setNodeSep] = useState(100);
+  const [edgeType, setEdgeType] = useState('smoothstep');
+  const [showFilters, setShowFilters] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Pane state: 'editor' = editor fullscreen, 'viz' = viz fullscreen, null = split view
   const [expandedPane, setExpandedPane] = useState<'editor' | 'viz' | null>(null);
 
   // Register custom node types
   const nodeTypes = {
     tableNode: TableNode,
+    cteNode: CTENode,
+    subqueryNode: SubqueryNode,
     sortNode: SortNode,
-  } as any;  // TypeScript workaround for node type registration
+  } as any; // TypeScript workaround for node type registration
+
+  // Filter nodes based on search query
+  const filteredNodes = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return nodes;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return nodes.map((node) => {
+      const data = node.data as any;
+      const tableName = data.tableName?.toLowerCase() || '';
+      const alias = data.alias?.toLowerCase() || '';
+      const cteName = data.cteName?.toLowerCase() || '';
+      const displayName = alias || tableName || cteName;
+
+      const matches = displayName.includes(query) ||
+                     data.fields?.some((f: string) => f.toLowerCase().includes(query));
+
+      return {
+        ...node,
+        style: matches
+          ? node.style
+          : { ...node.style, opacity: 0.3 },
+      };
+    });
+  }, [nodes, searchQuery]);
 
   // Parse SQL and update flow (only triggered by button click)
-  const parseAndUpdateFlow = useCallback((sqlText: string) => {
+  const parseAndUpdateFlow = useCallback(() => {
     try {
       setError(null);
-      const { nodes: newNodes, edges: newEdges } = sqlToFlowNodes(sqlText);
+      const { nodes: newNodes, edges: newEdges } = sqlToFlowNodes(
+        sql,
+        edgeType,
+        showFilters,
+        rankSep,
+        nodeSep
+      );
       setNodes(newNodes);
       setEdges(newEdges);
     } catch (err) {
@@ -50,12 +96,19 @@ function App() {
       setError(errorMessage);
       console.error('Parse error:', err);
     }
-  }, [setNodes, setEdges]);
+  }, [sql, edgeType, showFilters, rankSep, nodeSep, setNodes, setEdges]);
 
   // Initial parse on mount
   useEffect(() => {
-    parseAndUpdateFlow(sql);
+    parseAndUpdateFlow();
   }, []);
+
+  // Re-parse when layout settings change
+  useEffect(() => {
+    if (nodes.length > 0) {
+      parseAndUpdateFlow();
+    }
+  }, [rankSep, nodeSep, edgeType, showFilters]);
 
   const handleEditorChange = (value: string | undefined) => {
     const newSql = value || '';
@@ -64,7 +117,7 @@ function App() {
   };
 
   const handleVisualizeClick = () => {
-    parseAndUpdateFlow(sql);
+    parseAndUpdateFlow();
   };
 
   const toggleEditor = () => {
@@ -79,7 +132,6 @@ function App() {
   const handleExportAsPng = useCallback(() => {
     setIsExporting(true);
 
-    // Small delay to ensure UI is ready
     setTimeout(() => {
       const viewport = document.querySelector('.react-flow__viewport');
 
@@ -90,10 +142,10 @@ function App() {
       }
 
       toPng(viewport as HTMLElement, {
-        backgroundColor: '#0f172a', // Match our gray-900 background
+        backgroundColor: '#0f172a',
         cacheBust: true,
         quality: 1,
-        pixelRatio: 2, // Higher resolution
+        pixelRatio: 2,
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left',
@@ -114,14 +166,14 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-gray-900">
+    <div className="flex h-screen w-screen flex-col bg-slate-900">
       {/* Header */}
-      <header className="flex h-12 items-center border-b border-gray-700 bg-gray-800 px-4">
-        <h1 className="text-lg font-semibold text-blue-400">
+      <header className="flex h-12 items-center border-b border-slate-700 bg-slate-800 px-4">
+        <h1 className="text-lg font-semibold text-indigo-400">
           Visual SQL Flow Mapper
         </h1>
-        <span className="ml-3 rounded bg-blue-900/50 px-2 py-0.5 text-xs text-blue-300">
-          PoC
+        <span className="ml-3 rounded bg-indigo-900/50 px-2 py-0.5 text-xs text-indigo-300">
+          Beta
         </span>
       </header>
 
@@ -129,29 +181,23 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Monaco Editor */}
         <div
-          className={`flex flex-col border-r border-gray-700 transition-all duration-300 ${
+          className={`flex flex-col border-r border-slate-700 transition-all duration-300 ${
             expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-1/2'
           }`}
         >
-          <div className="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-2">
-            <span className="text-sm font-medium text-gray-300">SQL Editor</span>
+          <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-3 py-2">
+            <span className="text-sm font-medium text-slate-300">SQL Editor</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">node-sql-parser</span>
+              <span className="text-xs text-slate-500">node-sql-parser</span>
               <button
                 onClick={toggleEditor}
-                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                 title={expandedPane === 'editor' ? 'Split View' : 'Fullscreen'}
               >
                 {expandedPane === 'editor' ? (
-                  // Split view icon
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  </svg>
+                  <SplitSquareHorizontal className="w-4 h-4" />
                 ) : (
-                  // Fullscreen icon
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
+                  <Columns3 className="w-4 h-4" />
                 )}
               </button>
             </div>
@@ -175,10 +221,10 @@ function App() {
             />
           </div>
           {/* Visualize Button */}
-          <div className="border-t border-gray-700 bg-gray-800 p-3">
+          <div className="border-t border-slate-700 bg-slate-800 p-3">
             <button
               onClick={handleVisualizeClick}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
+              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
             >
               Visualize Query
             </button>
@@ -191,32 +237,26 @@ function App() {
             expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-1/2'
           }`}
         >
-          <div className="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-3 py-2">
-            <span className="text-sm font-medium text-gray-300">Flow Visualization</span>
+          <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-3 py-2">
+            <span className="text-sm font-medium text-slate-300">Flow Visualization</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">dagre auto-layout</span>
+              <span className="text-xs text-slate-500">dagre auto-layout</span>
               <button
                 onClick={toggleViz}
-                className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
                 title={expandedPane === 'viz' ? 'Split View' : 'Fullscreen'}
               >
                 {expandedPane === 'viz' ? (
-                  // Split view icon
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                  </svg>
+                  <SplitSquareHorizontal className="w-4 h-4" />
                 ) : (
-                  // Fullscreen icon
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
+                  <Columns3 className="w-4 h-4" />
                 )}
               </button>
             </div>
           </div>
           <div className="flex-1">
             <ReactFlow
-              nodes={nodes}
+              nodes={filteredNodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
@@ -226,20 +266,25 @@ function App() {
               defaultEdgeOptions={{
                 animated: true,
               }}
-              // Disable spacebar panning to prevent interference with Monaco editor
               panOnScroll={false}
               panActivationKeyCode={null}
             >
-              <Background color="#374151" gap={16} />
+              <Background color="#334155" gap={16} />
               <Controls
-                className="!border-gray-700 !bg-gray-800"
+                className="!border-slate-700 !bg-slate-800"
                 showZoom={true}
                 showFitView={true}
                 showInteractive={true}
               />
               <MiniMap
-                className="!bg-gray-800 !border-gray-700"
-                nodeColor="#1e293b"
+                className="!bg-slate-800 !border-slate-700"
+                nodeColor={(node) => {
+                  const type = node.type || '';
+                  if (type === 'cteNode') return '#0891b2';
+                  if (type === 'sortNode') return '#a855f7';
+                  if (type === 'subqueryNode') return '#6366f1';
+                  return '#1e293b';
+                }}
                 maskColor="rgba(0, 0, 0, 0.6)"
               />
 
@@ -257,27 +302,28 @@ function App() {
                   "
                   title="Download diagram as PNG"
                 >
-                  {isExporting ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v8m0 0l4-4m-4 4l4-4m8 0l4 4m0-8v8m0 0l-4 4m4-4l-4-4" />
-                      </svg>
-                      <span>Exporting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      <span>Download PNG</span>
-                    </>
-                  )}
+                  <Download className="w-4 h-4" />
+                  <span>{isExporting ? 'Exporting...' : 'Download PNG'}</span>
                 </button>
               </Panel>
             </ReactFlow>
           </div>
         </div>
       </div>
+
+      {/* Settings Sidebar */}
+      <SettingsSidebar
+        onRankSepChange={setRankSep}
+        onNodeSepChange={setNodeSep}
+        onEdgeTypeChange={setEdgeType}
+        onShowFiltersToggle={() => setShowFilters(!showFilters)}
+        onSearchChange={setSearchQuery}
+        showFilters={showFilters}
+        currentEdgeType={edgeType}
+        rankSep={rankSep}
+        nodeSep={nodeSep}
+        searchQuery={searchQuery}
+      />
 
       {/* Error Banner */}
       {error && (
@@ -306,7 +352,7 @@ function App() {
 
       {/* Empty State */}
       {nodes.length === 0 && !error && (
-        <div className="pointer-events-none absolute bottom-1/2 right-1/4 flex -translate-y-1/2 translate-x-1/2 flex-col items-center text-center text-gray-500">
+        <div className="pointer-events-none absolute bottom-1/2 right-1/4 flex -translate-y-1/2 translate-x-1/2 flex-col items-center text-center text-slate-500">
           <svg
             className="mb-3 h-16 w-16 opacity-50"
             fill="none"
