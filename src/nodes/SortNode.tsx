@@ -19,6 +19,7 @@ export const SortNode = memo((props: NodeProps) => {
       style={{
         padding: '0',
         minHeight: '80px',
+        background: '#581c87', // purple-900 for minimap visibility
       }}
     >
       {/* Input Handle (top) */}

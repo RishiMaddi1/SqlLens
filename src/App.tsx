@@ -13,6 +13,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import './reactflow-custom.css';
 import { toPng } from 'html-to-image';
 import { Download, Columns3, SplitSquareHorizontal } from 'lucide-react';
 import { sqlToFlowNodes } from './utils/astToFlowMapper';
@@ -43,6 +44,9 @@ function App() {
 
   // Pane state: 'editor' = editor fullscreen, 'viz' = viz fullscreen, null = split view
   const [expandedPane, setExpandedPane] = useState<'editor' | 'viz' | null>(null);
+
+  // ReactFlow instance ref for fitView
+  const reactFlowInstance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
 
   // Register custom node types
   const nodeTypes = {
@@ -91,6 +95,13 @@ function App() {
       );
       setNodes(newNodes);
       setEdges(newEdges);
+
+      // Fit view after nodes are updated
+      setTimeout(() => {
+        if (reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({ padding: 0.2, duration: 300 });
+        }
+      }, 50);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to parse SQL';
       setError(errorMessage);
@@ -261,6 +272,11 @@ function App() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               nodeTypes={nodeTypes}
+              onInit={(instance) => {
+                reactFlowInstance.current = instance;
+                // Initial fit view
+                instance.fitView({ padding: 0.2, duration: 300 });
+              }}
               fitView
               fitViewOptions={{ padding: 0.2 }}
               defaultEdgeOptions={{
@@ -271,25 +287,31 @@ function App() {
             >
               <Background color="#334155" gap={16} />
               <Controls
-                className="!border-slate-700 !bg-slate-800"
+                className="!border-slate-700 !bg-slate-800 !bg-opacity-95"
                 showZoom={true}
                 showFitView={true}
                 showInteractive={true}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                }}
               />
               <MiniMap
-                className="!bg-slate-800 !border-slate-700"
+                className="!bg-slate-900 !border-slate-700"
                 nodeColor={(node) => {
                   const type = node.type || '';
-                  if (type === 'cteNode') return '#0891b2';
-                  if (type === 'sortNode') return '#a855f7';
-                  if (type === 'subqueryNode') return '#6366f1';
-                  return '#1e293b';
+                  if (type === 'cteNode') return '#0891b2'; // cyan-600
+                  if (type === 'sortNode') return '#a855f7'; // purple-600
+                  if (type === 'subqueryNode') return '#6366f1'; // indigo-600
+                  return '#4f46e5'; // indigo-600 for tables
                 }}
-                maskColor="rgba(0, 0, 0, 0.6)"
+                maskColor="rgba(0, 0, 0, 0.7)"
+                pannable
+                zoomable
               />
 
-              {/* Export PNG Button Panel */}
-              <Panel position="top-right">
+              {/* Export PNG Button Panel - positioned to avoid minimap overlap */}
+              <Panel position="top-left">
                 <button
                   onClick={handleExportAsPng}
                   disabled={isExporting || nodes.length === 0}

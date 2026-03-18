@@ -32,6 +32,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
       style={{
         padding: '0',
         minHeight: '80px',
+        background: '#3730a3', // indigo-900 for minimap visibility
       }}
     >
       {/* Input Handle (top) */}

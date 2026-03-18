@@ -35,6 +35,7 @@ export const TableNode = memo((props: NodeProps) => {
       style={{
         padding: '0',
         minHeight: hasFilters ? 'auto' : '80px',
+        background: hasFilters ? '#1e293b' : '#1e293b',
       }}
     >
       {/* Input Handle (top) */}

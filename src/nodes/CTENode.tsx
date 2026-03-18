@@ -28,6 +28,7 @@ export const CTENode = memo((props: NodeProps) => {
       style={{
         padding: '0',
         minHeight: '80px',
+        background: '#164e63', // cyan-900 for minimap visibility
       }}
     >
       {/* Input Handle (top) */}

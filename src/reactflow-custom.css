@@ -1,0 +1,56 @@
+/* Custom ReactFlow Controls styling for dark theme */
+.react-flow__controls-button {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  fill: #e2e8f0 !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: #e2e8f0 !important;
+}
+
+/* Fix Minimap node visibility */
+.react-flow__minimap-node {
+  fill: #4f46e5 !important;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Fix edge labels */
+.react-flow__edge-labelbg {
+  fill: #1e293b !important;
+  fill-opacity: 0.9 !important;
+}
+
+.react-flow__edge-label {
+  fill: #94a3b8 !important;
+  font-size: 11px !important;
+}
+
+/* Fix handles */
+.react-flow__handle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid !important;
+}
+
+/* Fix selection styling */
+.react-flow__node.selected {
+  outline: none !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #6366f1 !important;
+}
+
+/* Fix background dots */
+.react-flow__background {
+  background-color: #0f172a !important;
+}
