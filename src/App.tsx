@@ -150,6 +150,9 @@ function App() {
 
     setIsExporting(true);
 
+    // Small delay to allow loading overlay to render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Store current viewport for restoration
     const currentViewport = reactFlowInstance.current.getViewport();
 
@@ -222,6 +225,8 @@ function App() {
       // Restore original viewport
       reactFlowInstance.current?.setViewport(currentViewport);
 
+      // Small delay before hiding loading screen
+      await new Promise(resolve => setTimeout(resolve, 100));
       setIsExporting(false);
     }
   }, [nodes]);
@@ -315,7 +320,23 @@ function App() {
               </button>
             </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 relative">
+            {/* Export Loading Overlay */}
+            {isExporting && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-4">
+                  <svg className="w-12 h-12 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-white">Exporting Diagram</p>
+                    <p className="text-sm text-slate-400 mt-1">Please wait...</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <ReactFlow
               nodes={filteredNodes}
               edges={edges}
@@ -377,32 +398,17 @@ function App() {
                   <button
                     onClick={handleExportAsPng}
                     disabled={isExporting || nodes.length === 0}
-                    className={`
+                    className="
                       flex items-center gap-2 px-4 py-2 rounded-lg
+                      bg-purple-600 hover:bg-purple-700 active:bg-purple-800
                       text-white text-sm font-medium
                       disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-all shadow-lg border
-                      ${isExporting
-                        ? 'bg-purple-800 border-purple-900 cursor-wait'
-                        : 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border-purple-700'
-                      }
-                    `}
+                      transition-colors shadow-lg border border-purple-700
+                    "
                     title="Download diagram as PNG"
                   >
-                    {isExporting ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span className="hidden sm:inline">Exporting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Download PNG</span>
-                      </>
-                    )}
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Download PNG</span>
                   </button>
                 </div>
               </Panel>
