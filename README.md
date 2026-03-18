@@ -2,7 +2,8 @@
 
 A 100% client-side SQL query visualizer that parses SQL queries into an Abstract Syntax Tree (AST) and renders an interactive dependency graph showing table relationships, filters, and sorting.
 
-<img width="4740" height="3492" alt="sql-flow-diagram (6)" src="https://github.com/user-attachments/assets/d4fb26fb-7c7b-4b34-8a54-1f46d28253e9" />
+<img width="3080" height="3108" alt="sql-flow-diagram (11)" src="https://github.com/user-attachments/assets/adfe9978-25fd-4540-9eac-7e685ee471eb" />
+
 
 
 ![Visual SQL Flow Mapper](https://img.shields.io/badge/React-18.3-blue) ![Vite](https://img.shields.io/badge/Vite-6.0-purple) ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)
