@@ -1,4 +1,4 @@
-import { X, Search, Eye, EyeOff } from 'lucide-react';
+import { X, Search, Eye, EyeOff, Type } from 'lucide-react';
 
 interface SettingsSidebarProps {
   isOpen: boolean;
@@ -8,11 +8,15 @@ interface SettingsSidebarProps {
   onEdgeTypeChange: (type: string) => void;
   onShowFiltersToggle: () => void;
   onSearchChange: (query: string) => void;
+  onFontSizeChange: (value: number) => void;
+  onMultiColorJoinsToggle: () => void;
   showFilters: boolean;
   currentEdgeType: string;
   rankSep: number;
   nodeSep: number;
   searchQuery: string;
+  fontSize: number;
+  multiColorJoins: boolean;
 }
 
 export function SettingsSidebar({
@@ -23,11 +27,15 @@ export function SettingsSidebar({
   onEdgeTypeChange,
   onShowFiltersToggle,
   onSearchChange,
+  onFontSizeChange,
+  onMultiColorJoinsToggle,
   showFilters,
   currentEdgeType,
   rankSep,
   nodeSep,
   searchQuery,
+  fontSize,
+  multiColorJoins,
 }: SettingsSidebarProps) {
   const edgeTypes: { label: string; value: string }[] = [
     { label: 'Smooth Step', value: 'smoothstep' },
@@ -141,6 +149,43 @@ export function SettingsSidebar({
                 )}
                 <span>{showFilters ? 'Showing Filters' : 'Filters Hidden'}</span>
               </button>
+              <button
+                onClick={onMultiColorJoinsToggle}
+                className={`
+                  w-full px-4 py-2.5 text-sm rounded-lg border flex items-center gap-2 transition-all
+                  ${
+                    multiColorJoins
+                      ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
+                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  }
+                `}
+              >
+                <div className={`w-4 h-4 rounded-full ${multiColorJoins ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500' : 'bg-slate-500'}`} />
+                <span>{multiColorJoins ? 'Multi-Color Joins' : 'Single-Color Joins'}</span>
+              </button>
+            </div>
+
+            {/* Font Size */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Type className="w-4 h-4" />
+                Font Size
+              </h3>
+              <div>
+                <label className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                  <span>Text Size</span>
+                  <span className="font-mono text-indigo-400">{fontSize}px</span>
+                </label>
+                <input
+                  type="range"
+                  min="11"
+                  max="18"
+                  step="1"
+                  value={fontSize}
+                  onChange={(e) => onFontSizeChange(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+              </div>
             </div>
 
             {/* Search Nodes */}

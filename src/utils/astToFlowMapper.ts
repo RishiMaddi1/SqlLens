@@ -471,7 +471,9 @@ export function sqlToFlowNodes(
   edgeType: string = 'smoothstep',
   showFilters: boolean = true,
   rankSep: number = 150,
-  nodeSep: number = 100
+  nodeSep: number = 100,
+  fontSize: number = 14,
+  multiColorJoins: boolean = true
 ): { nodes: Node[]; edges: Edge[] } {
   console.log('========================================');
   console.log('SQL TO FLOW NODES');
@@ -536,6 +538,7 @@ export function sqlToFlowNodes(
         alias: table.alias,
         fields: displayFields,
         filters: showFilters ? table.filters : [],
+        fontSize: fontSize,
       },
       position: { x: 0, y: 0 },
     });
@@ -551,7 +554,23 @@ export function sqlToFlowNodes(
   // Build edges
   const allEdges: Edge[] = [];
 
+  // Color palette for multi-color joins
+  const joinColors = [
+    '#60a5fa', // blue-400
+    '#34d399', // emerald-400
+    '#f472b6', // pink-400
+    '#fbbf24', // amber-400
+    '#a78bfa', // violet-400
+    '#fb7185', // rose-400
+    '#38bdf8', // sky-400
+  ];
+  let colorIndex = 0;
+
   for (const join of joins) {
+    const edgeColor = multiColorJoins
+      ? joinColors[colorIndex % joinColors.length]
+      : '#60a5fa';
+
     allEdges.push({
       id: `edge-${join.from}-${join.to}`,
       source: join.from,
@@ -559,10 +578,14 @@ export function sqlToFlowNodes(
       label: join.type,
       type: edgeType,
       animated: true,
-      style: { stroke: '#60a5fa', strokeWidth: 2 },
+      style: { stroke: edgeColor, strokeWidth: 2 },
       labelStyle: { fill: '#94a3b8', fontSize: 11 },
       labelBgStyle: { fill: '#1e293b', fillOpacity: 0.9 },
     });
+
+    if (multiColorJoins) {
+      colorIndex++;
+    }
   }
 
   // ORDER BY - single edge from final table
@@ -572,7 +595,7 @@ export function sqlToFlowNodes(
     allNodes.push({
       id: sortNodeId,
       type: 'sortNode',
-      data: { sortColumns: orderBy },
+      data: { sortColumns: orderBy, fontSize: fontSize },
       position: { x: 0, y: 0 },
     });
 

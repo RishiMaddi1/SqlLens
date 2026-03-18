@@ -7,10 +7,12 @@ interface TableNodeData {
   alias?: string;
   fields: string[];
   filters?: string[];
+  fontSize?: number;
 }
 
 export const TableNode = memo((props: NodeProps) => {
   const data = props.data as unknown as TableNodeData;
+  const fontSize = data.fontSize || 14;
   const hasFilters = data.filters && data.filters.length > 0;
   const hasAlias = data.alias && data.alias !== data.tableName;
   const needsScroll = data.fields.length > 12 || (data.filters?.length || 0) > 8;
@@ -58,7 +60,7 @@ export const TableNode = memo((props: NodeProps) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-slate-400" />
-              <span className="font-semibold text-slate-200 text-sm">
+              <span className="font-semibold text-slate-200" style={{ fontSize: `${fontSize}px` }}>
                 {data.tableName}
               </span>
             </div>
@@ -72,8 +74,8 @@ export const TableNode = memo((props: NodeProps) => {
           </div>
           {hasAlias && (
             <div className="flex items-center gap-1.5 ml-6">
-              <span className="text-slate-500 text-xs">as</span>
-              <code className="text-indigo-400 text-xs bg-slate-900/50 px-1.5 py-0.5 rounded">
+              <span className="text-slate-500" style={{ fontSize: `${fontSize - 2}px` }}>as</span>
+              <code className="text-indigo-400 bg-slate-900/50 px-1.5 py-0.5 rounded" style={{ fontSize: `${fontSize - 2}px` }}>
                 {data.alias}
               </code>
             </div>
@@ -99,7 +101,8 @@ export const TableNode = memo((props: NodeProps) => {
               {data.fields.map((field: string, index: number) => (
                 <li
                   key={index}
-                  className="group flex items-center gap-2 text-xs"
+                  className="group flex items-center gap-2"
+                  style={{ fontSize: `${fontSize - 2}px` }}
                 >
                   <span className="text-slate-500">•</span>
                   <code
@@ -122,7 +125,7 @@ export const TableNode = memo((props: NodeProps) => {
         <div className="px-3 py-2 border-t border-indigo-500/30 bg-indigo-950/30 rounded-b-lg">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Filter className="w-3 h-3 text-indigo-400" />
-            <span className="text-indigo-300 text-[10px] font-semibold uppercase tracking-wide">
+            <span className="text-indigo-300 font-semibold uppercase tracking-wide" style={{ fontSize: `${fontSize - 4}px` }}>
               Filtered by
             </span>
           </div>
@@ -136,7 +139,8 @@ export const TableNode = memo((props: NodeProps) => {
             {data.filters!.map((filter: string, index: number) => (
               <code
                 key={index}
-                className="block text-indigo-200/90 text-[10px] font-mono bg-slate-900/50 px-2 py-1 rounded truncate"
+                className="block text-indigo-200/90 font-mono bg-slate-900/50 px-2 py-1 rounded truncate"
+                style={{ fontSize: `${fontSize - 4}px` }}
                 title={filter}
               >
                 {filter}

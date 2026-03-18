@@ -4,10 +4,12 @@ import { ArrowDownAZ } from 'lucide-react';
 
 interface SortNodeData {
   sortColumns: Array<{ column: string; direction: string }>;
+  fontSize?: number;
 }
 
 export const SortNode = memo((props: NodeProps) => {
   const data = props.data as unknown as SortNodeData;
+  const fontSize = data.fontSize || 14;
   const needsScroll = data.sortColumns.length > 8;
 
   return (
@@ -33,7 +35,7 @@ export const SortNode = memo((props: NodeProps) => {
       <div className="px-4 py-2.5 border-b border-purple-500/30 bg-purple-500/10 rounded-t-lg">
         <div className="flex items-center gap-2">
           <ArrowDownAZ className="w-4 h-4 text-purple-400" />
-          <span className="font-semibold text-purple-200 text-sm uppercase tracking-wide">
+          <span className="font-semibold text-purple-200 uppercase tracking-wide" style={{ fontSize: `${fontSize}px` }}>
             ORDER BY
           </span>
         </div>
@@ -56,7 +58,8 @@ export const SortNode = memo((props: NodeProps) => {
             {data.sortColumns.map((sort: { column: string; direction: string }, index: number) => (
               <li
                 key={index}
-                className="flex items-center justify-between gap-2 text-xs bg-slate-900/50 px-3 py-2 rounded"
+                className="flex items-center justify-between gap-2 bg-slate-900/50 px-3 py-2 rounded"
+                style={{ fontSize: `${fontSize - 2}px` }}
               >
                 <code
                   className="flex-1 text-purple-100/90 font-mono truncate"
@@ -65,11 +68,12 @@ export const SortNode = memo((props: NodeProps) => {
                   {sort.column}
                 </code>
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${
+                  className={`px-2 py-0.5 rounded font-semibold flex-shrink-0 ${
                     sort.direction === 'DESC'
                       ? 'bg-red-500/20 text-red-300'
                       : 'bg-green-500/20 text-green-300'
                   }`}
+                  style={{ fontSize: `${fontSize - 4}px` }}
                 >
                   {sort.direction}
                 </span>

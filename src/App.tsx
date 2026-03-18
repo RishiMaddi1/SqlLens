@@ -41,6 +41,8 @@ function App() {
   const [edgeType, setEdgeType] = useState('smoothstep');
   const [showFilters, setShowFilters] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fontSize, setFontSize] = useState(14);
+  const [multiColorJoins, setMultiColorJoins] = useState(true);
 
   // Pane state: 'editor' = editor fullscreen, 'viz' = viz fullscreen, null = split view
   const [expandedPane, setExpandedPane] = useState<'editor' | 'viz' | null>(null);
@@ -94,7 +96,9 @@ function App() {
         edgeType,
         showFilters,
         rankSep,
-        nodeSep
+        nodeSep,
+        fontSize,
+        multiColorJoins
       );
       setNodes(newNodes);
       setEdges(newEdges);
@@ -110,7 +114,7 @@ function App() {
       setError(errorMessage);
       console.error('Parse error:', err);
     }
-  }, [sql, edgeType, showFilters, rankSep, nodeSep, setNodes, setEdges]);
+  }, [sql, edgeType, showFilters, rankSep, nodeSep, fontSize, multiColorJoins, setNodes, setEdges]);
 
   // Initial parse on mount
   useEffect(() => {
@@ -122,7 +126,7 @@ function App() {
     if (nodes.length > 0) {
       parseAndUpdateFlow();
     }
-  }, [rankSep, nodeSep, edgeType, showFilters]);
+  }, [rankSep, nodeSep, edgeType, showFilters, fontSize, multiColorJoins]);
 
   const handleEditorChange = (value: string | undefined) => {
     const newSql = value || '';
@@ -428,11 +432,15 @@ function App() {
         onEdgeTypeChange={setEdgeType}
         onShowFiltersToggle={() => setShowFilters(!showFilters)}
         onSearchChange={setSearchQuery}
+        onFontSizeChange={setFontSize}
+        onMultiColorJoinsToggle={() => setMultiColorJoins(!multiColorJoins)}
         showFilters={showFilters}
         currentEdgeType={edgeType}
         rankSep={rankSep}
         nodeSep={nodeSep}
         searchQuery={searchQuery}
+        fontSize={fontSize}
+        multiColorJoins={multiColorJoins}
       />
 
       {/* Error Banner */}

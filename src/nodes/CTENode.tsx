@@ -5,10 +5,12 @@ import { FileCode, Copy } from 'lucide-react';
 interface CTENodeData {
   cteName: string;
   fields: string[];
+  fontSize?: number;
 }
 
 export const CTENode = memo((props: NodeProps) => {
   const data = props.data as unknown as CTENodeData;
+  const fontSize = data.fontSize || 14;
   const needsScroll = data.fields.length > 10;
 
   const [copied, setCopied] = useState(false);
@@ -43,7 +45,7 @@ export const CTENode = memo((props: NodeProps) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileCode className="w-4 h-4 text-cyan-400" />
-            <span className="font-semibold text-cyan-200 text-sm">
+            <span className="font-semibold text-cyan-200" style={{ fontSize: `${fontSize}px` }}>
               {data.cteName}
             </span>
           </div>
@@ -55,7 +57,7 @@ export const CTENode = memo((props: NodeProps) => {
             <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-400' : 'text-slate-500'}`} />
           </button>
         </div>
-        <span className="ml-auto text-[10px] text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded">
+        <span className="ml-auto text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded" style={{ fontSize: `${fontSize - 4}px` }}>
           CTE
         </span>
       </div>
@@ -78,7 +80,8 @@ export const CTENode = memo((props: NodeProps) => {
               {data.fields.map((field: string, index: number) => (
                 <li
                   key={index}
-                  className="group flex items-center gap-2 text-xs"
+                  className="group flex items-center gap-2"
+                  style={{ fontSize: `${fontSize - 2}px` }}
                 >
                   <span className="text-cyan-500">•</span>
                   <code

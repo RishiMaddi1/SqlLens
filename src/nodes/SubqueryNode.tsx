@@ -6,10 +6,12 @@ interface SubqueryNodeData {
   alias?: string;
   fields: string[];
   isDerivedTable: boolean;
+  fontSize?: number;
 }
 
 export const SubqueryNode = memo((props: NodeProps) => {
   const data = props.data as unknown as SubqueryNodeData;
+  const fontSize = data.fontSize || 14;
   const displayName = data.alias || '(subquery)';
   const nodeLabel = data.isDerivedTable ? 'DERIVED TABLE' : 'SUBQUERY';
   const needsScroll = data.fields.length > 10;
@@ -47,7 +49,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-indigo-400" />
-            <span className="font-semibold text-indigo-200 text-sm">
+            <span className="font-semibold text-indigo-200" style={{ fontSize: `${fontSize}px` }}>
               {displayName}
             </span>
           </div>
@@ -61,7 +63,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
             </button>
           )}
         </div>
-        <span className="ml-auto text-[10px] text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded">
+        <span className="ml-auto text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded" style={{ fontSize: `${fontSize - 4}px` }}>
           {nodeLabel}
         </span>
       </div>
@@ -84,7 +86,8 @@ export const SubqueryNode = memo((props: NodeProps) => {
               {data.fields.map((field: string, index: number) => (
                 <li
                   key={index}
-                  className="group flex items-center gap-2 text-xs"
+                  className="group flex items-center gap-2"
+                  style={{ fontSize: `${fontSize - 2}px` }}
                 >
                   <span className="text-indigo-500">•</span>
                   <code
