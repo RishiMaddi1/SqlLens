@@ -353,6 +353,8 @@ function App() {
               defaultEdgeOptions={{
                 animated: true,
               }}
+              minZoom={0.1}
+              maxZoom={2}
               panOnScroll={false}
               panActivationKeyCode={null}
             >
