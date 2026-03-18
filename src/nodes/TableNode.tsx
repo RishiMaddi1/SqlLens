@@ -3,6 +3,7 @@ import { memo } from 'react';
 
 interface TableNodeData {
   tableName: string;
+  alias?: string;
   fields: string[];
   filters?: string[];
 }
@@ -10,6 +11,7 @@ interface TableNodeData {
 export const TableNode = memo((props: NodeProps) => {
   const data = props.data as unknown as TableNodeData;
   const hasFilters = data.filters && data.filters.length > 0;
+  const hasAlias = data.alias && data.alias !== data.tableName;
 
   return (
     <div
@@ -37,15 +39,25 @@ export const TableNode = memo((props: NodeProps) => {
           ${hasFilters ? 'border-orange-500/30 bg-orange-500/10' : 'border-slate-600 bg-slate-700/50'}
         `}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-lg">📊</span>
-          <span className="font-bold text-slate-100 text-sm">
-            {data.tableName}
-          </span>
-          {hasFilters && (
-            <span className="ml-auto text-orange-400" title="Has filters">
-              🔍
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📊</span>
+            <span className="font-bold text-slate-100 text-sm">
+              {data.tableName}
             </span>
+            {hasFilters && (
+              <span className="ml-auto text-orange-400" title="Has filters">
+                🔍
+              </span>
+            )}
+          </div>
+          {hasAlias && (
+            <div className="flex items-center gap-1.5 ml-7">
+              <span className="text-slate-500 text-xs">as</span>
+              <span className="text-slate-400 text-xs font-mono bg-slate-900/50 px-2 py-0.5 rounded">
+                {data.alias}
+              </span>
+            </div>
           )}
         </div>
       </div>

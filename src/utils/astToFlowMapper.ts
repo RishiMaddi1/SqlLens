@@ -5,46 +5,8 @@ import type { Edge, Node } from '@xyflow/react';
 // Initialize parser
 const parser = new Parser();
 
-// Type for column reference in AST
-interface ColumnRef {
-  type: 'column_ref';
-  table?: string;
-  column: string;
-}
-
-// Type for a column in the SELECT clause
-interface ASTColumn {
-  expr: ColumnRef | { type: string; [key: string]: any };
-  as?: string | null;
-}
-
-// Type for ON condition
-interface OnCondition {
-  type: string;
-  left?: ColumnRef | any;
-  right?: ColumnRef | any;
-}
-
-// Type for FROM item with potential JOIN
-interface FromItem {
-  table: string | { table: string };
-  join?: string;
-  on?: OnCondition;
-  [key: string]: any;
-}
-
-// Type for SELECT AST
-interface SelectAST {
-  type: 'select';
-  columns?: ASTColumn[];
-  from?: FromItem[];
-  where?: any;
-  orderby?: any;
-  [key: string]: any;
-}
-
 /**
- * Parse SQL string into AST using node-sql-parser
+ * Parse SQL string into AST
  */
 export function parseSQL(sql: string): any {
   try {
@@ -57,328 +19,338 @@ export function parseSQL(sql: string): any {
   }
 }
 
+interface TableNode {
+  name: string;
+  alias?: string;
+  fields: string[];
+  filters: string[];
+  isCTE: boolean;
+  cteFields?: string[]; // Output fields if this is a CTE
+}
+
+interface JoinEdge {
+  from: string;
+  to: string;
+  type: string;
+}
+
+interface SelectAST {
+  type: 'select';
+  columns?: any[];
+  from?: any[];
+  where?: any;
+  orderby?: any;
+  with?: any;
+  [key: string]: any;
+}
+
 /**
- * Extract table name from various possible structures
+ * Extract table name from various AST structures
  */
-function extractTableName(item: string | { table: string } | ColumnRef | any): string | null {
-  if (typeof item === 'string') {
-    return item;
-  }
-  if (item?.table) {
-    if (typeof item.table === 'string') {
-      return item.table;
-    }
-    if (item.table?.table) {
-      return item.table.table;
-    }
-  }
-  if (item?.column && item?.table) {
-    return item.table;
+function extractTableName(item: any): string | null {
+  if (!item) return null;
+  if (typeof item === 'string') return item;
+  if (item.table) {
+    if (typeof item.table === 'string') return item.table;
+    if (item.table?.table) return item.table.table;
   }
   return null;
 }
 
 /**
- * Parse a binary expression (ON condition) to extract left and right table references
+ * Extract alias from FROM item
  */
-function extractTablesFromOnCondition(on: OnCondition): { leftTable?: string; rightTable?: string } | null {
-  if (!on || on.type !== 'binary_expr') {
-    return null;
-  }
-
-  let leftTable: string | undefined;
-  let rightTable: string | undefined;
-
-  if (on.left) {
-    if (on.left.type === 'column_ref' && (on.left as ColumnRef).table) {
-      leftTable = (on.left as ColumnRef).table;
-    } else if ((on.left as any).type === 'binary_expr') {
-      const nested = extractTablesFromOnCondition(on.left as any);
-      leftTable = nested?.leftTable;
-    }
-  }
-
-  if (on.right) {
-    if (on.right.type === 'column_ref' && (on.right as ColumnRef).table) {
-      rightTable = (on.right as ColumnRef).table;
-    } else if ((on.right as any).type === 'binary_expr') {
-      const nested = extractTablesFromOnCondition(on.right as any);
-      rightTable = nested?.rightTable;
-    }
-  }
-
-  if (leftTable || rightTable) {
-    return { leftTable, rightTable };
-  }
-
-  return null;
-}
-
-/**
- * Format a single value from the AST into a string
- */
-function formatValue(value: any): string {
-  if (!value) return '';
-
-  switch (value.type) {
-    case 'single_quote_string':
-    case 'double_quote_string':
-      return `'${value.value}'`;
-
-    case 'number':
-      return String(value.value);
-
-    case 'null':
-      return 'NULL';
-
-    case 'bool':
-      return value.value ? 'TRUE' : 'FALSE';
-
-    case 'column_ref':
-      const table = value.table ? `${value.table}.` : '';
-      return `${table}${value.column}`;
-
-    case 'star':
-      return '*';
-
-    default:
-      if (value.value !== undefined) {
-        return String(value.value);
-      }
-      if (value.type) {
-        // For complex expressions, return a readable placeholder
-        return `(${value.type})`;
-      }
-      return '';
-  }
-}
-
-/**
- * Recursively format a WHERE condition into a readable string
- * Handles BETWEEN, IN, and other complex operators
- */
-function formatCondition(condition: any): string {
-  if (!condition) return '';
-
-  // Handle AND/OR - these should be split at a higher level
-  if (condition.type === 'binary_expr' && (condition.operator === 'AND' || condition.operator === 'OR')) {
-    const left = formatCondition(condition.left);
-    const right = formatCondition(condition.right);
-    return `${left} ${condition.operator} ${right}`;
-  }
-
-  // Handle BETWEEN: "expr BETWEEN low AND high"
-  if (condition.type === 'binary_expr' && condition.operator === 'BETWEEN') {
-    const left = formatValue(condition.left);
-    // Between typically has: { left, operator: 'BETWEEN', right: { type: 'expr_list', value: [low, high] } }
-    if (condition.right && condition.right.type === 'expr_list') {
-      const values = condition.right.value || [];
-      const low = formatValue(values[0]);
-      const high = formatValue(values[1]);
-      return `${left} BETWEEN ${low} AND ${high}`;
-    }
-    // Alternative format: right is a binary_expr with AND
-    const right = formatCondition(condition.right);
-    return `${left} BETWEEN ${right}`;
-  }
-
-  // Handle IN: "expr IN (value1, value2, ...)"
-  if (condition.type === 'binary_expr' && (condition.operator === 'IN' || condition.operator === 'NOT IN')) {
-    const left = formatValue(condition.left);
-    if (condition.right && condition.right.type === 'expr_list') {
-      const values = condition.right.value || [];
-      const valueList = values.map(formatValue).join(', ');
-      return `${left} ${condition.operator} (${valueList})`;
-    }
-    const right = formatCondition(condition.right);
-    return `${left} ${condition.operator} (${right})`;
-  }
-
-  // Handle LIKE
-  if (condition.type === 'binary_expr' && condition.operator === 'LIKE') {
-    const left = formatValue(condition.left);
-    const right = formatValue(condition.right);
-    return `${left} LIKE ${right}`;
-  }
-
-  // Handle IS NULL / IS NOT NULL
-  if (condition.type === 'unary_expr' && (condition.operator === 'IS NULL' || condition.operator === 'IS NOT NULL')) {
-    const left = formatValue(condition.left);
-    return `${left} ${condition.operator}`;
-  }
-
-  // Handle standard binary operators: =, !=, <, >, <=, >=, etc.
-  if (condition.type === 'binary_expr') {
-    const left = formatValue(condition.left);
-    const right = formatValue(condition.right);
-    const op = condition.operator || '';
-    return `${left} ${op} ${right}`;
-  }
-
-  // Handle function calls and other expressions
-  if (condition.type === 'function') {
-    const args = condition.args?.value?.map(formatValue).join(', ') || '';
-    return `${condition.name}(${args})`;
-  }
-
-  // Handle column references
-  if (condition.type === 'column_ref') {
-    return formatValue(condition);
-  }
-
-  // Handle literal values
-  return formatValue(condition);
-}
-
-/**
- * Extract the table referenced in a condition
- * Returns the table name if the condition references a single table, undefined otherwise
- */
-function extractTableFromCondition(condition: any): string | undefined {
-  if (!condition) return undefined;
-
-  // Check left side for table reference
-  if (condition.left) {
-    if (condition.left.type === 'column_ref' && condition.left.table) {
-      return condition.left.table;
-    }
-    // Recurse for nested conditions
-    const leftTable = extractTableFromCondition(condition.left);
-    if (leftTable) return leftTable;
-  }
-
-  // Check right side for table reference (for IN lists, etc.)
-  if (condition.right) {
-    if (condition.right.type === 'column_ref' && condition.right.table) {
-      return condition.right.table;
-    }
-    // Don't recurse into right for operators like IN since right is just a value list
-    if (condition.operator !== 'IN' && condition.operator !== 'NOT IN' && condition.operator !== 'BETWEEN') {
-      const rightTable = extractTableFromCondition(condition.right);
-      if (rightTable) return rightTable;
-    }
-  }
-
-  // For IN lists and BETWEEN, check the left side again (it's the column being filtered)
-  if ((condition.operator === 'IN' || condition.operator === 'NOT IN' || condition.operator === 'BETWEEN') && condition.left) {
-    if (condition.left.type === 'column_ref' && condition.left.table) {
-      return condition.left.table;
-    }
-  }
-
+function extractAlias(item: any): string | undefined {
+  if (item?.as) return item.as;
   return undefined;
 }
 
 /**
- * Parse WHERE clause and extract conditions by table (Predicate Pushdown)
+ * Format value from AST
  */
-function extractWhereConditionsByTable(ast: SelectAST): Map<string, string[]> {
-  const filtersByTable = new Map<string, string[]>();
+function formatValue(value: any): string {
+  if (!value) return '';
+  if (value.type === 'single_quote_string') return `'${value.value}'`;
+  if (value.type === 'number') return String(value.value);
+  if (value.type === 'column_ref') {
+    const table = value.table ? `${value.table}.` : '';
+    return `${table}${value.column}`;
+  }
+  if (value.value !== undefined) return String(value.value);
+  return '';
+}
 
-  if (!ast.where) {
-    return filtersByTable;
+/**
+ * Format WHERE condition
+ */
+function formatCondition(condition: any): string {
+  if (!condition) return '';
+  if (condition.type === 'binary_expr') {
+    const left = formatValue(condition.left);
+    const right = formatValue(condition.right);
+    return `${left} ${condition.operator} ${right}`;
+  }
+  return formatValue(condition);
+}
+
+/**
+ * Parse WITH clause to extract CTE definitions
+ */
+function extractCTEDefinitions(ast: SelectAST): Map<string, { fields: string[]; internalAST: any }> {
+  const cteMap = new Map<string, { fields: string[]; internalAST: any }>();
+
+  if (!ast.with || !ast.with.with) {
+    return cteMap;
   }
 
-  console.log('WHERE clause:', ast.where);
+  const withClauses = Array.isArray(ast.with.with) ? ast.with.with : [ast.with.with];
 
-  // Split AND conditions into individual conditions
-  function splitAndConditions(condition: any): any[] {
-    if (!condition) return [];
+  for (const withClause of withClauses) {
+    if (!withClause) continue;
 
-    // If this is an AND operation, split it
-    if (condition.type === 'binary_expr' && condition.operator === 'AND') {
-      return [
-        ...splitAndConditions(condition.left),
-        ...splitAndConditions(condition.right),
-      ];
+    let cteName = '';
+    let cteStatement = null;
+
+    if (withClause.type === 'with') {
+      cteName = withClause.name || '';
+      cteStatement = withClause.statement;
+    } else if (withClause.statement) {
+      cteName = withClause.as?.name || withClause.name || '';
+      cteStatement = withClause.statement;
     }
 
-    // Otherwise, return as a single condition
-    return [condition];
+    if (!cteName || !cteStatement) continue;
+
+    // Extract CTE output fields
+    let outputFields: string[] = [];
+    const columns = withClause.columns?.value || [];
+    if (columns.length > 0) {
+      outputFields = columns.map((c: any) => c.column || c);
+    } else if (cteStatement.columns) {
+      outputFields = cteStatement.columns.map((c: any) => {
+        if (c.expr?.type === 'column_ref') {
+          const table = c.expr.table ? `${c.expr.table}.` : '';
+          return `${table}${c.expr.column}`;
+        }
+        return c.as || (c.expr?.column || '?');
+      });
+    }
+
+    cteMap.set(cteName, { fields: outputFields, internalAST: cteStatement });
+    console.log(`[CTE] ${cteName} -> ${outputFields.join(', ')}`);
   }
 
-  const conditions = splitAndConditions(ast.where);
-  console.log('Split conditions:', conditions.length);
+  return cteMap;
+}
 
-  for (const cond of conditions) {
+/**
+ * Parse WHERE clause and extract filters
+ */
+function extractWhereFilters(ast: SelectAST): Map<string, string[]> {
+  const filtersByTable = new Map<string, string[]>();
+
+  if (!ast.where) return filtersByTable;
+
+  function splitAnd(condition: any): any[] {
+    if (condition?.type === 'binary_expr' && condition.operator === 'AND') {
+      return [...splitAnd(condition.left), ...splitAnd(condition.right)];
+    }
+    return condition ? [condition] : [];
+  }
+
+  for (const cond of splitAnd(ast.where)) {
     const formatted = formatCondition(cond);
-    const table = extractTableFromCondition(cond);
-
-    console.log(`Condition: "${formatted}" -> Table: ${table || 'multi-table'}`);
-
-    // Only attach to single-table filters
-    if (table && formatted) {
-      if (!filtersByTable.has(table)) {
-        filtersByTable.set(table, []);
-      }
+    if (cond.left?.type === 'column_ref' && cond.left.table) {
+      const table = cond.left.table;
+      if (!filtersByTable.has(table)) filtersByTable.set(table, []);
       filtersByTable.get(table)!.push(formatted);
     }
   }
 
-  console.log('Filters by table:', Object.fromEntries(filtersByTable));
   return filtersByTable;
 }
 
 /**
- * Extract fields from the SELECT clause, grouped by table
+ * Map SELECT columns to their source tables/CTEs
  */
-function extractFieldsByTable(ast: SelectAST): Map<string, string[]> {
-  const fieldsByTable = new Map<string, string[]>();
+function mapColumnsToSources(ast: SelectAST, knownTables: Set<string>): Map<string, string[]> {
+  const columnMap = new Map<string, string[]>(); // source -> columns
 
-  if (!ast.columns || ast.columns.length === 0) {
-    return fieldsByTable;
-  }
+  if (!ast.columns) return columnMap;
 
   for (const col of ast.columns) {
-    let tableName: string | null = null;
-    let fieldName: string = '';
+    if (!col.expr) continue;
 
-    if (col.expr) {
-      if (col.expr.type === 'column_ref') {
-        tableName = col.expr.table || null;
-        fieldName = col.expr.column;
-      } else if (col.expr.type === 'star') {
-        tableName = null;
-        fieldName = '*';
-      } else {
-        const searchForColumnRef = (obj: any): void => {
-          if (!obj || typeof obj !== 'object') return;
-          if (obj.type === 'column_ref' && obj.table) {
-            if (!tableName) tableName = obj.table;
-            if (!fieldName) fieldName = obj.column;
-          }
-          Object.values(obj).forEach(v => searchForColumnRef(v));
-        };
-        searchForColumnRef(col.expr);
-        fieldName = fieldName || (col.as || '(expression)');
+    let sourceTable: string | undefined = undefined;
+    let columnName = '';
+
+    if (col.expr.type === 'column_ref') {
+      sourceTable = col.expr.table;
+      columnName = col.expr.column;
+    } else if (col.expr.type === 'star') {
+      // * goes to all tables
+      columnName = '*';
+      for (const table of knownTables) {
+        if (!columnMap.has(table)) columnMap.set(table, []);
+        columnMap.get(table)!.push('*');
       }
+      continue;
+    } else {
+      // Complex expression - try to find embedded column_ref
+      const searchForColumnRef = (obj: any): void => {
+        if (!obj || typeof obj !== 'object') return;
+        if (obj.type === 'column_ref' && obj.table) {
+          if (!sourceTable) sourceTable = obj.table;
+        }
+        Object.values(obj).forEach(v => searchForColumnRef(v));
+      };
+      searchForColumnRef(col.expr);
+      columnName = col.as || '(expression)';
     }
 
-    if (col.as) {
-      fieldName = col.as;
-    }
+    const displayName = col.as ? `${columnName} AS ${col.as}` : columnName;
 
-    if (tableName && fieldName) {
-      if (!fieldsByTable.has(tableName)) {
-        fieldsByTable.set(tableName, []);
-      }
-      fieldsByTable.get(tableName)!.push(fieldName);
-    } else if (fieldName === '*') {
-      fieldsByTable.set('*', ['*']);
+    if (sourceTable) {
+      if (!columnMap.has(sourceTable)) columnMap.set(sourceTable, []);
+      columnMap.get(sourceTable)!.push(displayName);
     }
   }
 
-  console.log('Fields by table:', Object.fromEntries(fieldsByTable));
-  return fieldsByTable;
+  console.log('[COLUMN MAP]', Object.fromEntries(columnMap));
+  return columnMap;
 }
 
 /**
- * Extract ORDER BY columns and directions
+ * Process FROM clause to extract tables and JOINs
  */
-function extractOrderByColumns(ast: SelectAST): Array<{ column: string; direction: string }> {
-  if (!ast.orderby) return [];
+function processFromClause(
+  fromClause: any[] | undefined,
+  knownCTEs: Set<string>,
+  filtersByTable: Map<string, string[]>
+): { tables: TableNode[]; joins: JoinEdge[] } {
+  const tables: TableNode[] = [];
+  const joins: JoinEdge[] = [];
+  const tableAliasMap = new Map<string, string>(); // alias/real-name -> effective ID
 
-  console.log('ORDER BY clause:', ast.orderby);
+  if (!fromClause || !Array.isArray(fromClause)) {
+    return { tables, joins };
+  }
+
+  // First pass: create table nodes
+  for (let i = 0; i < fromClause.length; i++) {
+    const fromItem = fromClause[i];
+    const realTableName = extractTableName(fromItem);
+    const alias = extractAlias(fromItem);
+
+    if (!realTableName) continue;
+
+    const effectiveId = alias || realTableName;
+
+    // Check if this is a CTE reference
+    const isCTE = knownCTEs.has(realTableName);
+
+    // Skip duplicate nodes (same effective ID already processed)
+    if (tableAliasMap.has(effectiveId)) {
+      console.log(`[SKIP] Duplicate table reference: ${effectiveId}`);
+      continue;
+    }
+
+    tableAliasMap.set(effectiveId, effectiveId);
+    if (alias && alias !== realTableName) {
+      tableAliasMap.set(realTableName, effectiveId);
+    }
+
+    const filters = filtersByTable.get(realTableName) || filtersByTable.get(alias || '') || [];
+
+    tables.push({
+      name: realTableName,
+      alias: alias,
+      fields: [], // Will be populated from SELECT clause
+      filters,
+      isCTE,
+    });
+  }
+
+  // Second pass: create JOIN edges
+  for (let i = 1; i < fromClause.length; i++) {
+    const fromItem = fromClause[i];
+    const joinType = fromItem.join || 'JOIN';
+    const targetAlias = extractAlias(fromItem) || extractTableName(fromItem);
+
+    if (!targetAlias) continue;
+
+    const targetId = tableAliasMap.get(targetAlias);
+    if (!targetId) continue;
+
+    let sourceId: string | null = null;
+
+    // Find source from ON clause
+    if (fromItem.on) {
+      function findTableInExpr(expr: any): string | null {
+        if (!expr) return null;
+        if (expr.type === 'column_ref' && expr.table) {
+          return tableAliasMap.get(expr.table) || null;
+        }
+        if (expr.left) {
+          const left = findTableInExpr(expr.left);
+          if (left) return left;
+        }
+        if (expr.right) {
+          return findTableInExpr(expr.right);
+        }
+        return null;
+      }
+      sourceId = findTableInExpr(fromItem.on);
+    }
+
+    // Fallback: previous table
+    if (!sourceId && i > 0) {
+      const prevItem = fromClause[i - 1];
+      const prevAlias = extractAlias(prevItem) || extractTableName(prevItem);
+      if (prevAlias) {
+        sourceId = tableAliasMap.get(prevAlias) || null;
+      }
+    }
+
+    if (sourceId) {
+      joins.push({
+        from: sourceId,
+        to: targetId,
+        type: joinType,
+      });
+      console.log(`[JOIN] ${sourceId} --[${joinType}]--> ${targetId}`);
+    }
+  }
+
+  return { tables, joins };
+}
+
+/**
+ * Find the final table in the join chain (the one with no outgoing edges)
+ */
+function findFinalTable(tables: TableNode[], joins: JoinEdge[]): string | null {
+  const hasOutgoing = new Set<string>();
+
+  for (const join of joins) {
+    hasOutgoing.add(join.from);
+  }
+
+  for (const table of tables) {
+    const id = table.alias || table.name;
+    if (!hasOutgoing.has(id)) {
+      console.log(`[FINAL TABLE] ${id} (no outgoing edges)`);
+      return id;
+    }
+  }
+
+  return tables[tables.length - 1]?.alias || tables[tables.length - 1]?.name || null;
+}
+
+/**
+ * Extract ORDER BY columns
+ */
+function extractOrderBy(ast: SelectAST): Array<{ column: string; direction: string }> {
+  if (!ast.orderby) return [];
 
   const result: Array<{ column: string; direction: string }> = [];
   const orderByItems = Array.isArray(ast.orderby) ? ast.orderby : [ast.orderby];
@@ -406,89 +378,11 @@ function extractOrderByColumns(ast: SelectAST): Array<{ column: string; directio
     }
   }
 
-  console.log('Extracted ORDER BY:', result);
   return result;
 }
 
 /**
- * Extract tables, JOINs, and fields from the AST
- */
-export function extractTablesJoinsAndFields(
-  ast: SelectAST
-): {
-  tables: Set<string>;
-  joins: Array<{ from: string; to: string; type: string }>;
-  fieldsByTable: Map<string, string[]>;
-} {
-  const tables = new Set<string>();
-  const joins: Array<{ from: string; to: string; type: string }> = [];
-
-  const fieldsByTable = extractFieldsByTable(ast);
-
-  if (ast.from && Array.isArray(ast.from)) {
-    console.log('FROM items:', ast.from);
-
-    for (let i = 0; i < ast.from.length; i++) {
-      const fromItem = ast.from[i];
-      const tableName = extractTableName(fromItem);
-
-      if (tableName) {
-        tables.add(tableName);
-      }
-
-      if (fromItem.join && fromItem.on) {
-        const tableRefs = extractTablesFromOnCondition(fromItem.on);
-
-        if (tableRefs?.leftTable && tableRefs?.rightTable) {
-          joins.push({
-            from: tableRefs.leftTable,
-            to: tableRefs.rightTable,
-            type: fromItem.join || 'JOIN',
-          });
-
-          tables.add(tableRefs.leftTable);
-          tables.add(tableRefs.rightTable);
-
-          console.log(`Smart edge: ${tableRefs.leftTable} → ${tableRefs.rightTable} (${fromItem.join})`);
-        } else if (tableName && i > 0) {
-          const prevTable = extractTableName(ast.from[i - 1]);
-          if (prevTable) {
-            joins.push({
-              from: prevTable,
-              to: tableName,
-              type: fromItem.join || 'JOIN',
-            });
-            console.log(`Fallback edge: ${prevTable} → ${tableName} (${fromItem.join})`);
-          }
-        }
-      }
-    }
-  }
-
-  console.log('Final tables:', Array.from(tables));
-  console.log('Final joins:', joins);
-
-  return { tables, joins, fieldsByTable };
-}
-
-/**
- * Find leaf nodes (tables with no outgoing edges)
- */
-function findLeafNodes(tableNames: string[], joins: Array<{ from: string; to: string }>): string[] {
-  const hasOutgoing = new Set<string>();
-
-  for (const join of joins) {
-    hasOutgoing.add(join.from);
-  }
-
-  const leafNodes = tableNames.filter(name => !hasOutgoing.has(name));
-
-  console.log('Leaf nodes (no outgoing edges):', leafNodes);
-  return leafNodes;
-}
-
-/**
- * Apply dagre layout with TOP-to-BOTTOM direction
+ * Apply dagre layout
  */
 export function applyDagreLayout(
   nodes: Node[],
@@ -497,51 +391,50 @@ export function applyDagreLayout(
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-  dagreGraph.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 120 });
+  dagreGraph.setGraph({ rankdir: 'TB', nodesep: 100, ranksep: 150 });
 
   nodes.forEach((node) => {
-    let nodeHeight = 100;
-    let nodeWidth = 240;
-
+    let h = 100;
     if (node.type === 'tableNode') {
-      const data = node.data as { fields?: string[]; filters?: string[] };
-      const fieldCount = data.fields?.length || 0;
-      const filterCount = data.filters?.length || 0;
-      nodeHeight = Math.max(100, 70 + fieldCount * 24 + filterCount * 28);
+      const data = node.data as { fields?: string[]; filters?: string[]; alias?: string };
+      h = Math.max(100, 70 + (data.fields?.length || 0) * 24 + (data.filters?.length || 0) * 28);
+      if (data.alias) h += 20;
+    } else if (node.type === 'cteNode') {
+      const data = node.data as { fields?: string[] };
+      h = Math.max(80, 60 + (data.fields?.length || 0) * 24);
     } else if (node.type === 'sortNode') {
       const data = node.data as { sortColumns?: Array<{ column: string; direction: string }> };
-      const sortCount = data.sortColumns?.length || 0;
-      nodeHeight = Math.max(80, 60 + sortCount * 28);
+      h = Math.max(80, 60 + (data.sortColumns?.length || 0) * 28);
     }
-
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    dagreGraph.setNode(node.id, { width: 280, height: h });
   });
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+  edges.forEach((e) => {
+    dagreGraph.setEdge(e.source, e.target);
   });
 
   dagre.layout(dagreGraph);
 
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x - nodeWithPosition.width / 2,
-        y: nodeWithPosition.y - nodeWithPosition.height / 2,
-      },
-    };
-  });
-
-  return { nodes: layoutedNodes, edges };
+  return {
+    nodes: nodes.map((node) => {
+      const pos = dagreGraph.node(node.id);
+      return {
+        ...node,
+        position: { x: pos.x - 140, y: pos.y - pos.height / 2 },
+      };
+    }),
+    edges,
+  };
 }
 
 /**
- * Main conversion function: SQL → AST → ReactFlow nodes & edges
- * Now with Predicate Pushdown for WHERE conditions
+ * Main conversion function
  */
 export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
+  console.log('========================================');
+  console.log('SQL TO FLOW NODES');
+  console.log('========================================');
+
   const astResult = parseSQL(sql);
 
   if (!astResult) {
@@ -554,100 +447,115 @@ export function sqlToFlowNodes(sql: string): { nodes: Node[]; edges: Edge[] } {
     return { nodes: [], edges: [] };
   }
 
-  // Extract WHERE conditions by table (Predicate Pushdown)
-  const filtersByTable = extractWhereConditionsByTable(ast);
+  console.log('[MODE] Processing query...');
 
-  // Extract tables, JOINs, and fields
-  const { tables, joins, fieldsByTable } = extractTablesJoinsAndFields(ast);
+  // Extract CTE definitions
+  const cteMap = extractCTEDefinitions(ast);
+  const knownCTEs = new Set(cteMap.keys());
 
-  // Handle wildcard (*)
-  const hasWildcard = fieldsByTable.has('*');
-  const allFieldList = hasWildcard ? ['*'] : [];
+  // Extract WHERE filters
+  const filtersByTable = extractWhereFilters(ast);
 
-  // Create table nodes with inline filters
-  const tableNodes: Node[] = Array.from(tables).map((tableName) => {
-    const fields = fieldsByTable.get(tableName) || allFieldList;
-    const filters = filtersByTable.get(tableName) || [];
+  // Process FROM clause
+  const { tables, joins } = processFromClause(ast.from, knownCTEs, filtersByTable);
 
-    return {
-      id: tableName,
-      type: 'tableNode',
+  // Map known tables
+  const knownTables = new Set<string>();
+  for (const table of tables) {
+    knownTables.add(table.alias || table.name);
+  }
+
+  // Map SELECT columns to their source tables
+  const columnMap = mapColumnsToSources(ast, knownTables);
+
+  // Build nodes
+  const allNodes: Node[] = [];
+  const nodeIdMap = new Map<string, string>();
+
+  for (const table of tables) {
+    // Use alias as ID if exists, otherwise use table name
+    const nodeId = table.alias || table.name;
+    const fields = columnMap.get(nodeId) || [];
+
+    // If this is a CTE, also include its output fields
+    let displayFields = fields;
+    if (table.isCTE) {
+      const cteInfo = cteMap.get(table.name);
+      if (cteInfo && fields.length === 0) {
+        displayFields = cteInfo.fields;
+      }
+    }
+
+    allNodes.push({
+      id: nodeId,
+      type: table.isCTE ? 'cteNode' : 'tableNode',
       data: {
-        tableName,
-        fields,
-        filters,
+        tableName: table.name,
+        alias: table.alias,
+        fields: displayFields,
+        filters: table.filters,
       },
       position: { x: 0, y: 0 },
-    };
-  });
+    });
 
-  // Create table edges (JOINs)
-  const tableEdges: Edge[] = joins.map((join, index) => ({
-    id: `edge-${index}`,
-    source: join.from,
-    target: join.to,
-    label: join.type,
-    type: 'smoothstep',
-    animated: true,
-    style: {
-      stroke: '#60a5fa',
-      strokeWidth: 2,
-    },
-    labelStyle: {
-      fill: '#94a3b8',
-      fontSize: 11,
-      fontWeight: 500,
-    },
-    labelBgStyle: {
-      fill: '#1e293b',
-      fillOpacity: 0.9,
-    },
-  }));
+    nodeIdMap.set(nodeId, nodeId);
+    if (table.alias) {
+      nodeIdMap.set(table.name, nodeId);
+    }
 
-  let allNodes = [...tableNodes];
-  let allEdges = [...tableEdges];
+    console.log(`[NODE] ${nodeId} (${table.isCTE ? 'CTE' : 'Table'}) - Fields: ${displayFields.join(', ')}`);
+  }
 
-  // Extract ORDER BY and create SortNode
-  const orderByColumns = extractOrderByColumns(ast);
+  // Build edges
+  const allEdges: Edge[] = [];
 
-  if (orderByColumns.length > 0) {
-    const sortNodeId = 'sort-0';
-    const sortNode: Node = {
-      id: sortNodeId,
-      type: 'sortNode',
-      data: {
-        sortColumns: orderByColumns,
-      },
-      position: { x: 0, y: 0 },
-    };
-    allNodes.push(sortNode);
-
-    // Connect leaf nodes to sort
-    const leafNodes = findLeafNodes(Array.from(tables), joins);
-    leafNodes.forEach((leafName, index) => {
-      allEdges.push({
-        id: `edge-leaf-sort-${index}`,
-        source: leafName,
-        target: sortNodeId,
-        type: 'smoothstep',
-        animated: true,
-        style: {
-          stroke: '#a855f7',
-          strokeWidth: 2,
-        },
-      });
+  for (const join of joins) {
+    allEdges.push({
+      id: `edge-${join.from}-${join.to}`,
+      source: join.from,
+      target: join.to,
+      label: join.type,
+      type: 'smoothstep',
+      animated: true,
+      style: { stroke: '#60a5fa', strokeWidth: 2 },
+      labelStyle: { fill: '#94a3b8', fontSize: 11 },
+      labelBgStyle: { fill: '#1e293b', fillOpacity: 0.9 },
     });
   }
 
-  console.log('=== FINAL RESULTS ===');
-  console.log('Nodes:', allNodes.length, 'Edges:', allEdges.length);
-  console.log('====================');
+  // ORDER BY - single edge from final table
+  const orderBy = extractOrderBy(ast);
+  if (orderBy.length > 0) {
+    const sortNodeId = 'sort-0';
+    allNodes.push({
+      id: sortNodeId,
+      type: 'sortNode',
+      data: { sortColumns: orderBy },
+      position: { x: 0, y: 0 },
+    });
 
-  // Apply vertical layout
-  const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
-    allNodes,
-    allEdges
-  );
+    const finalTableId = findFinalTable(tables, joins);
+    if (finalTableId) {
+      allEdges.push({
+        id: `edge-to-sort`,
+        source: finalTableId,
+        target: sortNodeId,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#a855f7', strokeWidth: 2 },
+        label: 'ORDER BY',
+        labelStyle: { fill: '#a855f7', fontSize: 10 },
+        labelBgStyle: { fill: '#3b0764', fillOpacity: 0.8 },
+      });
+      console.log(`[ORDER BY] Connected to ${finalTableId}`);
+    }
+  }
 
-  return { nodes: layoutedNodes, edges: layoutedEdges };
+  console.log(`[RESULT] ${allNodes.length} nodes, ${allEdges.length} edges`);
+  console.log('========================================');
+
+  // Apply layout
+  const { nodes: layoutedNodes } = applyDagreLayout(allNodes, allEdges);
+
+  return { nodes: layoutedNodes, edges: allEdges };
 }
