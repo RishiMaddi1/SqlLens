@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Settings, X, Search, Eye, EyeOff } from 'lucide-react';
+import { X, Search, Eye, EyeOff } from 'lucide-react';
 
 interface SettingsSidebarProps {
+  isOpen: boolean;
+  onToggle: () => void;
   onRankSepChange: (value: number) => void;
   onNodeSepChange: (value: number) => void;
   onEdgeTypeChange: (type: string) => void;
@@ -15,6 +16,8 @@ interface SettingsSidebarProps {
 }
 
 export function SettingsSidebar({
+  isOpen,
+  onToggle,
   onRankSepChange,
   onNodeSepChange,
   onEdgeTypeChange,
@@ -26,8 +29,6 @@ export function SettingsSidebar({
   nodeSep,
   searchQuery,
 }: SettingsSidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
   const edgeTypes: { label: string; value: string }[] = [
     { label: 'Smooth Step', value: 'smoothstep' },
     { label: 'Straight', value: 'straight' },
@@ -37,24 +38,11 @@ export function SettingsSidebar({
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          fixed top-4 right-4 z-10 p-3 rounded-lg shadow-lg
-          bg-slate-800 border border-slate-700 hover:bg-slate-700
-          transition-all duration-200
-        `}
-        title="Layout Settings"
-      >
-        <Settings className="w-5 h-5 text-indigo-400" />
-      </button>
-
       {/* Sidebar Panel */}
       <div
         className={`
           fixed top-0 right-0 h-full w-80 bg-slate-900 border-l border-slate-700
-          shadow-2xl z-20 transition-transform duration-300 ease-in-out
+          shadow-2xl z-30 transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
@@ -63,7 +51,7 @@ export function SettingsSidebar({
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
             <h2 className="text-lg font-semibold text-slate-200">Layout Settings</h2>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={onToggle}
               className="p-1 hover:bg-slate-800 rounded transition-colors"
             >
               <X className="w-5 h-5 text-slate-400" />
@@ -175,6 +163,14 @@ export function SettingsSidebar({
           </div>
         </div>
       </div>
+
+      {/* Overlay when sidebar is open */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20"
+          onClick={onToggle}
+        />
+      )}
     </>
   );
 }

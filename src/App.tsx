@@ -15,7 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import './reactflow-custom.css';
 import { toPng } from 'html-to-image';
-import { Download, Columns3, SplitSquareHorizontal } from 'lucide-react';
+import { Download, Columns3, SplitSquareHorizontal, Settings } from 'lucide-react';
 import { sqlToFlowNodes } from './utils/astToFlowMapper';
 import { TableNode } from './nodes/TableNode';
 import { CTENode } from './nodes/CTENode';
@@ -44,6 +44,9 @@ function App() {
 
   // Pane state: 'editor' = editor fullscreen, 'viz' = viz fullscreen, null = split view
   const [expandedPane, setExpandedPane] = useState<'editor' | 'viz' | null>(null);
+
+  // Settings sidebar state
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ReactFlow instance ref for fitView
   const reactFlowInstance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
@@ -141,40 +144,71 @@ function App() {
 
   // Export the flow diagram as PNG
   const handleExportAsPng = useCallback(() => {
+    if (!reactFlowInstance.current) {
+      console.error('React Flow instance not available');
+      return;
+    }
+
     setIsExporting(true);
 
-    setTimeout(() => {
-      const viewport = document.querySelector('.react-flow__viewport');
+    // Get the bounds of all nodes to capture the entire graph
+    const { width, height, x, y } = reactFlowInstance.current.getNodesBounds(nodes);
 
-      if (!viewport) {
-        console.error('Could not find React Flow viewport');
+    // Add padding
+    const padding = 50;
+    const exportWidth = width + padding * 2;
+    const exportHeight = height + padding * 2;
+
+    // Temporarily fit view to capture everything
+    const currentViewport = reactFlowInstance.current.getViewport();
+    reactFlowInstance.current.setViewport({
+      x: -x + padding,
+      y: -y + padding,
+      zoom: 1,
+    });
+
+    setTimeout(() => {
+      const flowElement = document.querySelector('.react-flow');
+
+      if (!flowElement) {
+        console.error('Could not find React Flow element');
         setIsExporting(false);
         return;
       }
 
-      toPng(viewport as HTMLElement, {
+      toPng(flowElement as HTMLElement, {
         backgroundColor: '#0f172a',
         cacheBust: true,
         quality: 1,
-        pixelRatio: 2,
+        pixelRatio: 3,
+        width: exportWidth,
+        height: exportHeight,
         style: {
-          transform: 'scale(1)',
+          width: `${exportWidth}px`,
+          height: `${exportHeight}px`,
+          transform: 'none',
           transformOrigin: 'top left',
         },
+        skipAutoScale: true,
       })
         .then((dataUrl) => {
           const link = document.createElement('a');
           link.download = 'sql-flow-diagram.png';
           link.href = dataUrl;
           link.click();
+
+          // Restore the original view
+          reactFlowInstance.current?.setViewport(currentViewport);
           setIsExporting(false);
         })
         .catch((err) => {
           console.error('Failed to export diagram:', err);
+          // Restore the original view on error
+          reactFlowInstance.current?.setViewport(currentViewport);
           setIsExporting(false);
         });
-    }, 100);
-  }, []);
+    }, 200);
+  }, [nodes]);
 
   return (
     <div className="flex h-screen w-screen flex-col bg-slate-900">
@@ -287,14 +321,9 @@ function App() {
             >
               <Background color="#334155" gap={16} />
               <Controls
-                className="!border-slate-700 !bg-slate-800 !bg-opacity-95"
                 showZoom={true}
                 showFitView={true}
                 showInteractive={true}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                }}
               />
               <MiniMap
                 className="!bg-slate-900 !border-slate-700"
@@ -310,23 +339,43 @@ function App() {
                 zoomable
               />
 
-              {/* Export PNG Button Panel - positioned to avoid minimap overlap */}
-              <Panel position="top-left">
-                <button
-                  onClick={handleExportAsPng}
-                  disabled={isExporting || nodes.length === 0}
-                  className="
-                    flex items-center gap-2 px-4 py-2 rounded-lg
-                    bg-purple-600 hover:bg-purple-700 active:bg-purple-800
-                    text-white text-sm font-medium
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    transition-colors shadow-lg
-                  "
-                  title="Download diagram as PNG"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>{isExporting ? 'Exporting...' : 'Download PNG'}</span>
-                </button>
+              {/* Export PNG and Settings Buttons Panel */}
+              <Panel position="top-right">
+                <div className="flex gap-2">
+                  {/* Settings Button */}
+                  <button
+                    onClick={() => setSettingsOpen(!settingsOpen)}
+                    className={`
+                      flex items-center justify-center w-10 h-10 rounded-lg transition-all
+                      ${settingsOpen
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-indigo-400'
+                      }
+                    `}
+                    title="Layout Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+
+                  {/* Download PNG Button */}
+                  <button
+                    onClick={handleExportAsPng}
+                    disabled={isExporting || nodes.length === 0}
+                    className="
+                      flex items-center gap-2 px-4 py-2 rounded-lg
+                      bg-purple-600 hover:bg-purple-700 active:bg-purple-800
+                      text-white text-sm font-medium
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      transition-colors shadow-lg border border-purple-700
+                    "
+                    title="Download diagram as PNG"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className={isExporting ? '' : 'hidden sm:inline'}>
+                      {isExporting ? 'Exporting...' : 'Download PNG'}
+                    </span>
+                  </button>
+                </div>
               </Panel>
             </ReactFlow>
           </div>
@@ -335,6 +384,8 @@ function App() {
 
       {/* Settings Sidebar */}
       <SettingsSidebar
+        isOpen={settingsOpen}
+        onToggle={() => setSettingsOpen(!settingsOpen)}
         onRankSepChange={setRankSep}
         onNodeSepChange={setNodeSep}
         onEdgeTypeChange={setEdgeType}

@@ -1,7 +1,13 @@
 /* Custom ReactFlow Controls styling for dark theme */
+.react-flow__controls {
+  box-shadow: none !important;
+}
+
 .react-flow__controls-button {
   background-color: #1e293b !important;
   border: 1px solid #334155 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
   fill: #e2e8f0 !important;
 }
 
@@ -12,6 +18,12 @@
 
 .react-flow__controls-button svg {
   fill: #e2e8f0 !important;
+}
+
+/* Fix any white corners in controls */
+.react-flow__controls::before,
+.react-flow__controls::after {
+  display: none !important;
 }
 
 /* Fix Minimap node visibility */
@@ -54,3 +66,4 @@
 .react-flow__background {
   background-color: #0f172a !important;
 }
+
