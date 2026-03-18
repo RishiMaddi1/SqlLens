@@ -30,36 +30,37 @@ export const TableNode = memo((props: NodeProps) => {
 
   return (
     <div
-      className={`
+      className="
         rounded-lg border shadow-lg min-w-[280px] max-w-[320px]
-        ${hasFilters ? 'border-indigo-500/50 bg-slate-800' : 'border-slate-600 bg-slate-800'}
-      `}
+        border-[#30363D]
+      "
       style={{
         padding: '0',
         minHeight: hasFilters ? 'auto' : '80px',
-        background: hasFilters ? '#1e293b' : '#1e293b',
+        background: '#161B22',
+        borderTop: '2px solid #818CF8',
       }}
     >
       {/* Input Handle (top) */}
       <Handle
         type="target"
         position={Position.Top}
-        className={`!border-slate-500 !-top-1 !w-2.5 !h-2.5 ${
-          hasFilters ? '!bg-indigo-500' : '!bg-slate-500'
+        className={`!border-[#484F58] !-top-1 !w-2.5 !h-2.5 ${
+          hasFilters ? '!bg-amber-500' : '!bg-slate-500'
         }`}
       />
 
       {/* Table Name Header */}
       <div
-        className={`
-          px-4 py-2.5 border-b rounded-t-lg
-          ${hasFilters ? 'border-indigo-500/30 bg-indigo-500/10' : 'border-slate-600 bg-slate-700/50'}
-        `}
+        className="
+          px-4 py-2.5 rounded-t-lg
+          border-b border-[#30363D]
+        "
       >
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-slate-400" />
+              <Database className="w-4 h-4 text-slate-400" strokeWidth={1.5} />
               <span className="font-semibold text-slate-200" style={{ fontSize: `${fontSize}px` }}>
                 {data.tableName}
               </span>
@@ -69,7 +70,7 @@ export const TableNode = memo((props: NodeProps) => {
               className="p-1 hover:bg-slate-600/50 rounded transition-colors"
               title={copied ? 'Copied!' : 'Copy table name'}
             >
-              <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-400' : 'text-slate-500'}`} />
+              <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-400' : 'text-slate-500'}`} strokeWidth={1.5} />
             </button>
           </div>
           {hasAlias && (
@@ -122,10 +123,10 @@ export const TableNode = memo((props: NodeProps) => {
 
       {/* Inline Filters Section */}
       {hasFilters && (
-        <div className="px-3 py-2 border-t border-indigo-500/30 bg-indigo-950/30 rounded-b-lg">
+        <div className="px-3 py-2 border-t border-[#30363D] rounded-b-lg" style={{ background: 'rgba(245, 158, 11, 0.08)' }}>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Filter className="w-3 h-3 text-indigo-400" />
-            <span className="text-indigo-300 font-semibold uppercase tracking-wide" style={{ fontSize: `${fontSize - 4}px` }}>
+            <Filter className="w-3 h-3 text-amber-400" strokeWidth={1.5} />
+            <span className="text-amber-400 font-semibold uppercase tracking-wide" style={{ fontSize: `${fontSize - 4}px` }}>
               Filtered by
             </span>
           </div>
@@ -139,7 +140,7 @@ export const TableNode = memo((props: NodeProps) => {
             {data.filters!.map((filter: string, index: number) => (
               <code
                 key={index}
-                className="block text-indigo-200/90 font-mono bg-slate-900/50 px-2 py-1 rounded truncate"
+                className="block text-amber-200/90 font-mono bg-[#0D1117]/50 px-2 py-1 rounded truncate"
                 style={{ fontSize: `${fontSize - 4}px` }}
                 title={filter}
               >
@@ -154,8 +155,8 @@ export const TableNode = memo((props: NodeProps) => {
       <Handle
         type="source"
         position={Position.Bottom}
-        className={`!border-slate-500 !-bottom-1 !w-2.5 !h-2.5 ${
-          hasFilters ? '!bg-indigo-500' : '!bg-blue-500'
+        className={`!border-[#484F58] !-bottom-1 !w-2.5 !h-2.5 ${
+          hasFilters ? '!bg-amber-500' : '!bg-slate-500'
         }`}
       />
     </div>

@@ -1,23 +1,33 @@
-/* Custom ReactFlow Controls styling for dark theme */
+/* Deep Slate Engineering Theme */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #0B0E14;
+}
+
+/* Controls styling - Deep Slate */
 .react-flow__controls {
-  box-shadow: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
 }
 
 .react-flow__controls-button {
-  background-color: #1e293b !important;
-  border: 1px solid #334155 !important;
+  background-color: #161B22 !important;
+  border: 1px solid #30363D !important;
   border-radius: 6px !important;
-  box-shadow: none !important;
-  fill: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  fill: #8B949E !important;
 }
 
 .react-flow__controls-button:hover {
-  background-color: #334155 !important;
-  border-color: #475569 !important;
+  background-color: #1C2128 !important;
+  border-color: #484F58 !important;
+  fill: #C9D1D9 !important;
 }
 
 .react-flow__controls-button svg {
-  fill: #e2e8f0 !important;
+  fill: #8B949E !important;
 }
 
 /* Fix any white corners in controls */
@@ -26,45 +36,55 @@
   display: none !important;
 }
 
-/* Fix Minimap node visibility */
+/* Minimap styling - Deep Slate */
+.react-flow__minimap {
+  background-color: #0B0E14 !important;
+  border: 1px solid #30363D !important;
+  border-radius: 6px !important;
+}
+
 .react-flow__minimap-node {
-  fill: #4f46e5 !important;
+  fill: #4F46E5 !important;
 }
 
 .react-flow__minimap-mask {
-  fill: rgba(0, 0, 0, 0.7) !important;
+  fill: rgba(79, 70, 229, 0.15) !important;
 }
 
-/* Fix edge labels */
+/* Edge labels - Indigo with subtle glow */
 .react-flow__edge-labelbg {
-  fill: #1e293b !important;
-  fill-opacity: 0.9 !important;
+  fill: #161B22 !important;
+  fill-opacity: 0.95 !important;
+  stroke: #30363D !important;
+  stroke-width: 1px !important;
 }
 
 .react-flow__edge-label {
-  fill: #94a3b8 !important;
+  fill: #A5B4FC !important;
   font-size: 11px !important;
+  font-weight: 500 !important;
+  text-shadow: 0 0 8px rgba(165, 180, 252, 0.5) !important;
 }
 
-/* Fix handles */
+/* Handles */
 .react-flow__handle {
   width: 10px !important;
   height: 10px !important;
   border: 2px solid !important;
 }
 
-/* Fix selection styling */
+/* Selection styling */
 .react-flow__node.selected {
   outline: none !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #6366f1 !important;
+  stroke: #818CF8 !important;
 }
 
-/* Fix background dots */
+/* Background - Solid Deep Slate */
 .react-flow__background {
-  background-color: #0f172a !important;
+  background-color: #0B0E14 !important;
 }
 
 /* Export mode - hide all UI elements */
@@ -84,3 +104,7 @@ body.exporting .react-flow__panel {
   top: -9999px !important;
 }
 
+/* Monospace font for code elements */
+code, .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Consolas', monospace;
+}

@@ -38,9 +38,9 @@ export function SettingsSidebar({
   multiColorJoins,
 }: SettingsSidebarProps) {
   const edgeTypes: { label: string; value: string }[] = [
+    { label: 'Bezier', value: 'default' },
     { label: 'Smooth Step', value: 'smoothstep' },
     { label: 'Straight', value: 'straight' },
-    { label: 'Bezier', value: 'default' },
     { label: 'Simple Bezier', value: 'simplebezier' },
   ];
 
@@ -49,20 +49,24 @@ export function SettingsSidebar({
       {/* Sidebar Panel */}
       <div
         className={`
-          fixed top-0 right-0 h-full w-80 bg-slate-900 border-l border-slate-700
+          fixed top-0 right-0 h-full w-80 backdrop-blur-md
           shadow-2xl z-30 transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
+        style={{
+          background: 'rgba(11, 14, 20, 0.95)',
+          borderLeft: '1px solid #30363D',
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #30363D' }}>
             <h2 className="text-lg font-semibold text-slate-200">Layout Settings</h2>
             <button
               onClick={onToggle}
               className="p-1 hover:bg-slate-800 rounded transition-colors"
             >
-              <X className="w-5 h-5 text-slate-400" />
+              <X className="w-5 h-5 text-slate-400" strokeWidth={1.5} />
             </button>
           </div>
 
@@ -79,12 +83,13 @@ export function SettingsSidebar({
                 </label>
                 <input
                   type="range"
-                  min="50"
-                  max="300"
-                  step="10"
+                  min="40"
+                  max="200"
+                  step="5"
                   value={rankSep}
                   onChange={(e) => onRankSepChange(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  style={{ background: '#161B22' }}
                 />
               </div>
 
@@ -95,12 +100,13 @@ export function SettingsSidebar({
                 </label>
                 <input
                   type="range"
-                  min="50"
-                  max="200"
-                  step="10"
+                  min="30"
+                  max="150"
+                  step="5"
                   value={nodeSep}
                   onChange={(e) => onNodeSepChange(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  style={{ background: '#161B22' }}
                 />
               </div>
             </div>
@@ -118,7 +124,7 @@ export function SettingsSidebar({
                       ${
                         currentEdgeType === edge.value
                           ? 'bg-indigo-600 border-indigo-500 text-white'
-                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-600'
+                          : 'bg-[#161B22] border-[#30363D] text-slate-300 hover:bg-[#1C2128] hover:border-[#484F58]'
                       }
                     `}
                   >
@@ -138,14 +144,14 @@ export function SettingsSidebar({
                   ${
                     showFilters
                       ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                      : 'bg-[#161B22] border-[#30363D] text-slate-300 hover:bg-[#1C2128] hover:border-[#484F58]'
                   }
                 `}
               >
                 {showFilters ? (
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-4 h-4" strokeWidth={1.5} />
                 ) : (
-                  <EyeOff className="w-4 h-4" />
+                  <EyeOff className="w-4 h-4" strokeWidth={1.5} />
                 )}
                 <span>{showFilters ? 'Showing Filters' : 'Filters Hidden'}</span>
               </button>
@@ -156,11 +162,11 @@ export function SettingsSidebar({
                   ${
                     multiColorJoins
                       ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                      : 'bg-[#161B22] border-[#30363D] text-slate-300 hover:bg-[#1C2128] hover:border-[#484F58]'
                   }
                 `}
               >
-                <div className={`w-4 h-4 rounded-full ${multiColorJoins ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500' : 'bg-slate-500'}`} />
+                <div className={`w-4 h-4 rounded-full ${multiColorJoins ? 'bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400' : 'bg-slate-600'}`} />
                 <span>{multiColorJoins ? 'Multi-Color Joins' : 'Single-Color Joins'}</span>
               </button>
             </div>
@@ -168,7 +174,7 @@ export function SettingsSidebar({
             {/* Font Size */}
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Type className="w-4 h-4" />
+                <Type className="w-4 h-4" strokeWidth={1.5} />
                 Font Size
               </h3>
               <div>
@@ -183,7 +189,8 @@ export function SettingsSidebar({
                   step="1"
                   value={fontSize}
                   onChange={(e) => onFontSizeChange(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  style={{ background: '#161B22' }}
                 />
               </div>
             </div>
@@ -192,13 +199,13 @@ export function SettingsSidebar({
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-300">Search Nodes</h3>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" strokeWidth={1.5} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
                   placeholder="Search table names..."
-                  className="w-full pl-10 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg
+                  className="w-full pl-10 pr-3 py-2 text-sm bg-[#161B22] border border-[#30363D] rounded-lg
                     text-slate-300 placeholder:text-slate-500
                     focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
                   "
@@ -212,7 +219,7 @@ export function SettingsSidebar({
       {/* Overlay when sidebar is open */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-20"
+          className="fixed inset-0 bg-black/50 z-20 backdrop-blur-sm"
           onClick={onToggle}
         />
       )}

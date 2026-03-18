@@ -28,28 +28,29 @@ export const SubqueryNode = memo((props: NodeProps) => {
   return (
     <div
       className="
-        rounded-lg border-2 border-indigo-500/50 bg-slate-800
-        shadow-lg min-w-[280px] max-w-[320px] backdrop-blur-sm
+        rounded-lg border shadow-lg min-w-[280px] max-w-[320px]
+        border-[#30363D]
       "
       style={{
         padding: '0',
         minHeight: '80px',
-        background: '#3730a3', // indigo-900 for minimap visibility
+        background: '#161B22',
+        borderTop: '2px solid #818CF8',
       }}
     >
       {/* Input Handle (top) */}
       <Handle
         type="target"
         position={Position.Top}
-        className="!bg-indigo-500 !border-indigo-400 !-top-1 !w-2.5 !h-2.5"
+        className="!bg-indigo-500 !border-[#484F58] !-top-1 !w-2.5 !h-2.5"
       />
 
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-indigo-500/30 bg-indigo-500/10 rounded-t-lg">
+      <div className="px-4 py-2.5 border-b border-[#30363D] rounded-t-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-indigo-400" />
-            <span className="font-semibold text-indigo-200" style={{ fontSize: `${fontSize}px` }}>
+            <Layers className="w-4 h-4 text-indigo-400" strokeWidth={1.5} />
+            <span className="font-semibold text-slate-200" style={{ fontSize: `${fontSize}px` }}>
               {displayName}
             </span>
           </div>
@@ -59,11 +60,11 @@ export const SubqueryNode = memo((props: NodeProps) => {
               className="p-1 hover:bg-slate-600/50 rounded transition-colors"
               title={copied ? 'Copied!' : 'Copy subquery'}
             >
-              <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-400' : 'text-slate-500'}`} />
+              <Copy className={`w-3.5 h-3.5 ${copied ? 'text-green-400' : 'text-slate-500'}`} strokeWidth={1.5} />
             </button>
           )}
         </div>
-        <span className="ml-auto text-indigo-400 bg-indigo-950/50 px-2 py-0.5 rounded" style={{ fontSize: `${fontSize - 4}px` }}>
+        <span className="ml-auto text-indigo-400 bg-[#0D1117]/50 px-2 py-0.5 rounded" style={{ fontSize: `${fontSize - 4}px` }}>
           {nodeLabel}
         </span>
       </div>
@@ -91,7 +92,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
                 >
                   <span className="text-indigo-500">•</span>
                   <code
-                    className="flex-1 text-indigo-100/90 font-mono truncate"
+                    className="flex-1 text-slate-300 font-mono truncate"
                     title={field}
                   >
                     {field}
@@ -101,7 +102,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
             </ul>
           </div>
         ) : (
-          <p className="text-indigo-200/50 text-xs italic">(inline subquery)</p>
+          <p className="text-slate-500 text-xs italic">(inline subquery)</p>
         )}
       </div>
 
@@ -109,7 +110,7 @@ export const SubqueryNode = memo((props: NodeProps) => {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!bg-indigo-500 !border-indigo-400 !-bottom-1 !w-2.5 !h-2.5"
+        className="!bg-indigo-500 !border-[#484F58] !-bottom-1 !w-2.5 !h-2.5"
       />
     </div>
   );

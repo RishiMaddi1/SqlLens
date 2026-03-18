@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import {
   ReactFlow,
-  Background,
   Controls,
   MiniMap,
   Panel,
@@ -24,8 +23,38 @@ import { SortNode } from './nodes/SortNode';
 import { SettingsSidebar } from './components/SettingsSidebar';
 
 // Default hardcoded query for the PoC
-const DEFAULT_QUERY =
-  'SELECT users.name, orders.total FROM users JOIN orders ON users.id = orders.user_id;';
+const DEFAULT_QUERY = `SELECT
+    users.name AS customer_name,
+    users.email AS customer_email,
+    orders.id AS order_reference,
+    orders.order_date,
+    products.name AS product_name,
+    categories.name AS category_name,
+    order_items.quantity,
+    order_items.price_at_purchase,
+    (order_items.quantity * order_items.price_at_purchase) AS line_item_total,
+    suppliers.company_name AS vendor,
+    shipping_methods.method_name AS shipping_via,
+    shipping_status.status_name AS delivery_status,
+    reviews.rating AS customer_rating,
+    reviews.comment AS customer_feedback
+FROM users
+JOIN orders ON users.id = orders.user_id
+JOIN order_items ON orders.id = order_items.order_id
+JOIN products ON order_items.product_id = products.id
+JOIN categories ON products.category_id = categories.id
+JOIN suppliers ON products.supplier_id = suppliers.id
+JOIN shipping_methods ON orders.shipping_method_id = shipping_methods.id
+JOIN shipping_status ON orders.status_id = shipping_status.id
+LEFT JOIN reviews ON users.id = reviews.user_id AND products.id = reviews.product_id
+WHERE orders.order_date BETWEEN '2024-01-01' AND '2024-12-31'
+  AND users.email LIKE '%@gmail.com'
+  AND categories.name IN ('Electronics', 'Computers', 'Gadgets')
+  AND order_items.price_at_purchase > 500
+  AND suppliers.country = 'USA'
+  AND shipping_status.status_name != 'Cancelled'
+  AND (reviews.rating < 3 OR reviews.rating IS NULL)
+ORDER BY order_items.price_at_purchase DESC;`;
 
 function App() {
   const [sql, setSql] = useState(DEFAULT_QUERY);
@@ -36,12 +65,12 @@ function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   // Layout settings
-  const [rankSep, setRankSep] = useState(150);
-  const [nodeSep, setNodeSep] = useState(100);
-  const [edgeType, setEdgeType] = useState('smoothstep');
+  const [rankSep, setRankSep] = useState(80);
+  const [nodeSep, setNodeSep] = useState(70);
+  const [edgeType, setEdgeType] = useState('default');
   const [showFilters, setShowFilters] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [fontSize, setFontSize] = useState(14);
+  const [fontSize, setFontSize] = useState(16);
   const [multiColorJoins, setMultiColorJoins] = useState(true);
 
   // Pane state: 'editor' = editor fullscreen, 'viz' = viz fullscreen, null = split view
@@ -49,6 +78,9 @@ function App() {
 
   // Settings sidebar state
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // MiniMap toggle state
+  const [showMiniMap, setShowMiniMap] = useState(true);
 
   // ReactFlow instance ref for fitView
   const reactFlowInstance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
@@ -198,7 +230,7 @@ function App() {
 
       // Generate clean PNG
       const dataUrl = await toPng(flowElement as HTMLElement, {
-        backgroundColor: '#0f172a',
+        backgroundColor: '#0B0E14',
         cacheBust: true,
         quality: 1,
         pixelRatio: 2,
@@ -236,13 +268,13 @@ function App() {
   }, [nodes]);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-slate-900">
+    <div className="flex h-screen w-screen flex-col" style={{ background: '#0B0E14' }}>
       {/* Header */}
-      <header className="flex h-12 items-center border-b border-slate-700 bg-slate-800 px-4">
-        <h1 className="text-lg font-semibold text-indigo-400">
+      <header className="flex h-14 items-center px-6" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
+        <h1 className="text-lg font-semibold text-slate-100">
           Visual SQL Flow Mapper
         </h1>
-        <span className="ml-3 rounded bg-indigo-900/50 px-2 py-0.5 text-xs text-indigo-300">
+        <span className="ml-3 rounded px-2.5 py-1 text-xs font-medium" style={{ background: '#161B22', color: '#8B949E', border: '1px solid #30363D' }}>
           Beta
         </span>
       </header>
@@ -251,34 +283,55 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Monaco Editor */}
         <div
-          className={`flex flex-col border-r border-slate-700 transition-all duration-300 ${
+          className={`flex flex-col transition-all duration-300 ${
             expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-1/2'
           }`}
+          style={{ borderRight: '1px solid #30363D' }}
         >
-          <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-3 py-2">
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
             <span className="text-sm font-medium text-slate-300">SQL Editor</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">node-sql-parser</span>
               <button
                 onClick={toggleEditor}
-                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-[#161B22] text-slate-500 hover:text-slate-300 transition-all"
                 title={expandedPane === 'editor' ? 'Split View' : 'Fullscreen'}
               >
                 {expandedPane === 'editor' ? (
-                  <SplitSquareHorizontal className="w-4 h-4" />
+                  <SplitSquareHorizontal className="w-4 h-4" strokeWidth={1.5} />
                 ) : (
-                  <Columns3 className="w-4 h-4" />
+                  <Columns3 className="w-4 h-4" strokeWidth={1.5} />
                 )}
               </button>
             </div>
           </div>
-          <div className="flex-1" onKeyDown={(e) => e.stopPropagation()}>
+          <div className="flex-1" style={{ background: '#0B0E14' }} onKeyDown={(e) => e.stopPropagation()}>
             <Editor
               height="100%"
               defaultLanguage="sql"
               theme="vs-dark"
               value={sql}
               onChange={handleEditorChange}
+              beforeMount={(monaco) => {
+                // Define custom theme matching our Deep Slate palette
+                monaco.editor.defineTheme('deep-slate', {
+                  base: 'vs-dark',
+                  inherit: true,
+                  rules: [],
+                  colors: {
+                    'editor.background': '#0B0E14',
+                    'editor.foreground': '#C9D1D9',
+                    'editorLineNumber.foreground': '#484F58',
+                    'editorLineNumber.activeForeground': '#8B949E',
+                    'editor.selectionBackground': '#4F46E533',
+                    'editor.inactiveSelectionBackground': '#4F46E522',
+                    'editorCursor.foreground': '#818CF8',
+                  },
+                });
+              }}
+              onMount={(editor, monaco) => {
+                monaco.editor.setTheme('deep-slate');
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
@@ -287,14 +340,15 @@ function App() {
                 automaticLayout: true,
                 tabSize: 2,
                 wordWrap: 'on',
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               }}
             />
           </div>
           {/* Visualize Button */}
-          <div className="border-t border-slate-700 bg-slate-800 p-3">
+          <div className="p-4" style={{ borderTop: '1px solid #30363D', background: '#0B0E14' }}>
             <button
               onClick={handleVisualizeClick}
-              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-700 active:bg-indigo-800"
+              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-all hover:bg-indigo-700 active:scale-[0.98] shadow-lg shadow-indigo-500/20"
             >
               Visualize Query
             </button>
@@ -306,35 +360,36 @@ function App() {
           className={`flex flex-col transition-all duration-300 ${
             expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-1/2'
           }`}
+          style={{ background: '#0B0E14' }}
         >
-          <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-3 py-2">
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
             <span className="text-sm font-medium text-slate-300">Flow Visualization</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">dagre auto-layout</span>
               <button
                 onClick={toggleViz}
-                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-[#161B22] text-slate-500 hover:text-slate-300 transition-all"
                 title={expandedPane === 'viz' ? 'Split View' : 'Fullscreen'}
               >
                 {expandedPane === 'viz' ? (
-                  <SplitSquareHorizontal className="w-4 h-4" />
+                  <SplitSquareHorizontal className="w-4 h-4" strokeWidth={1.5} />
                 ) : (
-                  <Columns3 className="w-4 h-4" />
+                  <Columns3 className="w-4 h-4" strokeWidth={1.5} />
                 )}
               </button>
             </div>
           </div>
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" style={{ background: '#0B0E14' }}>
             {/* Export Loading Overlay */}
             {isExporting && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm">
+              <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm" style={{ background: 'rgba(11, 14, 20, 0.95)' }}>
                 <div className="flex flex-col items-center gap-4">
                   <svg className="w-12 h-12 text-indigo-500 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   <div className="text-center">
-                    <p className="text-lg font-semibold text-white">Exporting Diagram</p>
+                    <p className="text-lg font-semibold text-slate-100">Exporting Diagram</p>
                     <p className="text-sm text-slate-400 mt-1">Please wait...</p>
                   </div>
                 </div>
@@ -362,25 +417,42 @@ function App() {
               panOnScroll={false}
               panActivationKeyCode={null}
             >
-              <Background color="#334155" gap={16} />
               <Controls
                 showZoom={true}
                 showFitView={true}
                 showInteractive={true}
               />
-              <MiniMap
-                className="!bg-slate-900 !border-slate-700"
-                nodeColor={(node) => {
-                  const type = node.type || '';
-                  if (type === 'cteNode') return '#0891b2'; // cyan-600
-                  if (type === 'sortNode') return '#a855f7'; // purple-600
-                  if (type === 'subqueryNode') return '#6366f1'; // indigo-600
-                  return '#4f46e5'; // indigo-600 for tables
-                }}
-                maskColor="rgba(0, 0, 0, 0.7)"
-                pannable
-                zoomable
-              />
+              {showMiniMap && (
+                <MiniMap
+                  className="!border-[#30363D]"
+                  nodeColor="#4F46E5"
+                  maskColor="rgba(79, 70, 229, 0.15)"
+                  pannable
+                  zoomable
+                />
+              )}
+
+              {/* MiniMap Toggle Button */}
+              <Panel position="bottom-left">
+                <button
+                  onClick={() => setShowMiniMap(!showMiniMap)}
+                  className="p-2 rounded-lg transition-all border"
+                  style={{
+                    background: '#161B22',
+                    borderColor: '#30363D',
+                    color: '#8B949E',
+                  }}
+                  title={showMiniMap ? 'Hide MiniMap' : 'Show MiniMap'}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {showMiniMap ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    )}
+                  </svg>
+                </button>
+              </Panel>
 
               {/* Export PNG and Settings Buttons Panel */}
               <Panel position="top-right">
@@ -389,15 +461,20 @@ function App() {
                   <button
                     onClick={() => setSettingsOpen(!settingsOpen)}
                     className={`
-                      flex items-center justify-center w-10 h-10 rounded-lg transition-all
+                      flex items-center justify-center w-10 h-10 rounded-lg transition-all border
                       ${settingsOpen
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-800 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-indigo-400'
+                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-500/20'
+                        : 'hover:bg-[#1C2128] hover:border-[#484F58] hover:text-slate-300'
                       }
                     `}
+                    style={settingsOpen ? undefined : {
+                      background: '#161B22',
+                      borderColor: '#30363D',
+                      color: '#8B949E',
+                    }}
                     title="Layout Settings"
                   >
-                    <Settings className="w-5 h-5" />
+                    <Settings className="w-5 h-5" strokeWidth={1.5} />
                   </button>
 
                   {/* Download PNG Button */}
@@ -406,14 +483,17 @@ function App() {
                     disabled={isExporting || nodes.length === 0}
                     className="
                       flex items-center gap-2 px-4 py-2 rounded-lg
-                      bg-purple-600 hover:bg-purple-700 active:bg-purple-800
-                      text-white text-sm font-medium
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-colors shadow-lg border border-purple-700
+                      text-slate-200 text-sm font-medium
+                      disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+                      transition-all border hover:bg-[#1C2128] hover:border-[#484F58]
                     "
+                    style={{
+                      background: '#161B22',
+                      borderColor: '#30363D',
+                    }}
                     title="Download diagram as PNG"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4" strokeWidth={1.5} />
                     <span className="hidden sm:inline">Download PNG</span>
                   </button>
                 </div>
@@ -445,9 +525,9 @@ function App() {
 
       {/* Error Banner */}
       {error && (
-        <div className="absolute bottom-4 left-4 right-4 mx-auto max-w-2xl rounded-lg border border-red-900 bg-red-950/90 p-4 text-red-200 shadow-lg backdrop-blur-sm">
+        <div className="absolute bottom-4 left-4 right-4 mx-auto max-w-2xl rounded-lg p-4 text-slate-300 shadow-lg backdrop-blur-sm" style={{ border: '1px solid #30363D', background: 'rgba(13, 17, 23, 0.95)' }}>
           <div className="flex items-start gap-3">
-            <span className="text-red-400">
+            <span className="text-slate-500">
               <svg
                 className="h-5 w-5"
                 fill="currentColor"
@@ -461,8 +541,8 @@ function App() {
               </svg>
             </span>
             <div className="flex-1">
-              <h3 className="font-semibold text-red-300">SQL Parse Error</h3>
-              <p className="mt-1 text-sm text-red-200/80">{error}</p>
+              <h3 className="font-semibold text-slate-200">SQL Parse Error</h3>
+              <p className="mt-1 text-sm text-slate-400">{error}</p>
             </div>
           </div>
         </div>
@@ -484,7 +564,7 @@ function App() {
               d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"
             />
           </svg>
-          <p className="text-sm">No tables found in query</p>
+          <p className="text-sm font-medium">No tables found in query</p>
         </div>
       )}
     </div>

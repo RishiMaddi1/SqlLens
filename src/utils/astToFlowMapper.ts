@@ -539,8 +539,12 @@ export function sqlToFlowNodes(
         fields: displayFields,
         filters: showFilters ? table.filters : [],
         fontSize: fontSize,
+        nodeColor: table.isCTE ? '#06b6d4' : '#10b981', // cyan or emerald
       },
       position: { x: 0, y: 0 },
+      style: {
+        background: '#ffffff',
+      },
     });
 
     nodeIdMap.set(nodeId, nodeId);
@@ -556,20 +560,20 @@ export function sqlToFlowNodes(
 
   // Color palette for multi-color joins
   const joinColors = [
-    '#60a5fa', // blue-400
-    '#34d399', // emerald-400
-    '#f472b6', // pink-400
-    '#fbbf24', // amber-400
-    '#a78bfa', // violet-400
-    '#fb7185', // rose-400
-    '#38bdf8', // sky-400
+    '#10b981', // emerald-500
+    '#06b6d4', // cyan-500
+    '#8b5cf6', // violet-500
+    '#f59e0b', // amber-500
+    '#ec4899', // pink-500
+    '#6366f1', // indigo-500
+    '#14b8a6', // teal-500
   ];
   let colorIndex = 0;
 
   for (const join of joins) {
     const edgeColor = multiColorJoins
       ? joinColors[colorIndex % joinColors.length]
-      : '#60a5fa';
+      : '#cbd5e1'; // slate-300 for light theme
 
     allEdges.push({
       id: `edge-${join.from}-${join.to}`,
@@ -577,10 +581,10 @@ export function sqlToFlowNodes(
       target: join.to,
       label: join.type,
       type: edgeType,
-      animated: true,
-      style: { stroke: edgeColor, strokeWidth: 2 },
-      labelStyle: { fill: '#94a3b8', fontSize: 11 },
-      labelBgStyle: { fill: '#1e293b', fillOpacity: 0.9 },
+      animated: false,
+      style: { stroke: edgeColor, strokeWidth: 1.5 },
+      labelStyle: { fill: '#64748b', fontSize: 11 },
+      labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: '#e2e8f0', strokeWidth: 1 },
     });
 
     if (multiColorJoins) {
@@ -597,6 +601,9 @@ export function sqlToFlowNodes(
       type: 'sortNode',
       data: { sortColumns: orderBy, fontSize: fontSize },
       position: { x: 0, y: 0 },
+      style: {
+        background: '#ffffff',
+      },
     });
 
     const finalTableId = findFinalTable(tables, joins);
@@ -606,11 +613,11 @@ export function sqlToFlowNodes(
         source: finalTableId,
         target: sortNodeId,
         type: edgeType,
-        animated: true,
-        style: { stroke: '#a855f7', strokeWidth: 2 },
+        animated: false,
+        style: { stroke: '#a855f7', strokeWidth: 1.5 },
         label: 'ORDER BY',
-        labelStyle: { fill: '#a855f7', fontSize: 10 },
-        labelBgStyle: { fill: '#3b0764', fillOpacity: 0.8 },
+        labelStyle: { fill: '#7c3aed', fontSize: 10 },
+        labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: '#e9d5ff', strokeWidth: 1 },
       });
       console.log(`[ORDER BY] Connected to ${finalTableId}`);
     }

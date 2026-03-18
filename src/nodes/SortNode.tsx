@@ -15,27 +15,28 @@ export const SortNode = memo((props: NodeProps) => {
   return (
     <div
       className="
-        rounded-lg border-2 border-purple-500/50 bg-slate-800
-        shadow-lg min-w-[280px] max-w-[320px] backdrop-blur-sm
+        rounded-lg border shadow-lg min-w-[280px] max-w-[320px]
+        border-[#30363D]
       "
       style={{
         padding: '0',
         minHeight: '80px',
-        background: '#581c87', // purple-900 for minimap visibility
+        background: '#161B22',
+        borderTop: '2px solid #A78BFA',
       }}
     >
       {/* Input Handle (top) */}
       <Handle
         type="target"
         position={Position.Top}
-        className="!bg-purple-500 !border-purple-400 !-top-1 !w-2.5 !h-2.5"
+        className="!bg-purple-500 !border-[#484F58] !-top-1 !w-2.5 !h-2.5"
       />
 
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-purple-500/30 bg-purple-500/10 rounded-t-lg">
+      <div className="px-4 py-2.5 border-b border-[#30363D] rounded-t-lg">
         <div className="flex items-center gap-2">
-          <ArrowDownAZ className="w-4 h-4 text-purple-400" />
-          <span className="font-semibold text-purple-200 uppercase tracking-wide" style={{ fontSize: `${fontSize}px` }}>
+          <ArrowDownAZ className="w-4 h-4 text-purple-400" strokeWidth={1.5} />
+          <span className="font-semibold text-slate-200 text-sm uppercase tracking-wide" style={{ fontSize: `${fontSize}px` }}>
             ORDER BY
           </span>
         </div>
@@ -58,22 +59,21 @@ export const SortNode = memo((props: NodeProps) => {
             {data.sortColumns.map((sort: { column: string; direction: string }, index: number) => (
               <li
                 key={index}
-                className="flex items-center justify-between gap-2 bg-slate-900/50 px-3 py-2 rounded"
+                className="flex items-center justify-between gap-2 text-xs bg-[#0D1117]/50 px-3 py-2 rounded border border-[#30363D]"
                 style={{ fontSize: `${fontSize - 2}px` }}
               >
                 <code
-                  className="flex-1 text-purple-100/90 font-mono truncate"
+                  className="flex-1 text-slate-300 font-mono truncate"
                   title={sort.column}
                 >
                   {sort.column}
                 </code>
                 <span
-                  className={`px-2 py-0.5 rounded font-semibold flex-shrink-0 ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${
                     sort.direction === 'DESC'
                       ? 'bg-red-500/20 text-red-300'
                       : 'bg-green-500/20 text-green-300'
                   }`}
-                  style={{ fontSize: `${fontSize - 4}px` }}
                 >
                   {sort.direction}
                 </span>
@@ -81,7 +81,7 @@ export const SortNode = memo((props: NodeProps) => {
             ))}
           </div>
         ) : (
-          <p className="text-purple-200/50 text-xs italic">(no sort)</p>
+          <p className="text-slate-500 text-xs italic">(no sort)</p>
         )}
       </div>
     </div>
