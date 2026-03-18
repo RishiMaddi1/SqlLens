@@ -142,72 +142,88 @@ function App() {
     setExpandedPane(expandedPane === 'viz' ? null : 'viz');
   };
 
-  // Export the flow diagram as PNG
-  const handleExportAsPng = useCallback(() => {
-    if (!reactFlowInstance.current) {
-      console.error('React Flow instance not available');
+  // Export the flow diagram as PNG with "Clean Capture" method
+  const handleExportAsPng = useCallback(async () => {
+    if (!reactFlowInstance.current || nodes.length === 0) {
       return;
     }
 
     setIsExporting(true);
 
-    // Get the bounds of all nodes to capture the entire graph
-    const { width, height, x, y } = reactFlowInstance.current.getNodesBounds(nodes);
-
-    // Add padding
-    const padding = 50;
-    const exportWidth = width + padding * 2;
-    const exportHeight = height + padding * 2;
-
-    // Temporarily fit view to capture everything
+    // Store current viewport for restoration
     const currentViewport = reactFlowInstance.current.getViewport();
+
+    // Calculate exact bounding box of all nodes
+    const bounds = reactFlowInstance.current.getNodesBounds(nodes);
+    const padding = 60;
+    const exportWidth = bounds.width + padding * 2;
+    const exportHeight = bounds.height + padding * 2;
+
+    // Hide UI elements before capture
+    const elementsToHide = [
+      ...document.querySelectorAll('.react-flow__minimap'),
+      ...document.querySelectorAll('.react-flow__controls'),
+      ...document.querySelectorAll('.react-flow__panel'),
+    ];
+
+    elementsToHide.forEach(el => {
+      (el as HTMLElement).style.display = 'none';
+    });
+
+    // Wait for browser to remove elements from paint cycle
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // Position viewport to capture exactly the node bounds
     reactFlowInstance.current.setViewport({
-      x: -x + padding,
-      y: -y + padding,
+      x: -bounds.x + padding,
+      y: -bounds.y + padding,
       zoom: 1,
     });
 
-    setTimeout(() => {
-      const flowElement = document.querySelector('.react-flow');
+    // Another wait for viewport to settle
+    await new Promise(resolve => setTimeout(resolve, 100));
 
+    try {
+      const flowElement = document.querySelector('.react-flow');
       if (!flowElement) {
-        console.error('Could not find React Flow element');
-        setIsExporting(false);
-        return;
+        throw new Error('React Flow element not found');
       }
 
-      toPng(flowElement as HTMLElement, {
+      // Generate clean PNG
+      const dataUrl = await toPng(flowElement as HTMLElement, {
         backgroundColor: '#0f172a',
         cacheBust: true,
         quality: 1,
-        pixelRatio: 3,
+        pixelRatio: 2,
         width: exportWidth,
         height: exportHeight,
         style: {
           width: `${exportWidth}px`,
           height: `${exportHeight}px`,
           transform: 'none',
-          transformOrigin: 'top left',
         },
         skipAutoScale: true,
-      })
-        .then((dataUrl) => {
-          const link = document.createElement('a');
-          link.download = 'sql-flow-diagram.png';
-          link.href = dataUrl;
-          link.click();
+      });
 
-          // Restore the original view
-          reactFlowInstance.current?.setViewport(currentViewport);
-          setIsExporting(false);
-        })
-        .catch((err) => {
-          console.error('Failed to export diagram:', err);
-          // Restore the original view on error
-          reactFlowInstance.current?.setViewport(currentViewport);
-          setIsExporting(false);
-        });
-    }, 200);
+      // Trigger download
+      const link = document.createElement('a');
+      link.download = 'sql-flow-diagram.png';
+      link.href = dataUrl;
+      link.click();
+
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      // Restore UI elements
+      elementsToHide.forEach(el => {
+        (el as HTMLElement).style.display = '';
+      });
+
+      // Restore original viewport
+      reactFlowInstance.current?.setViewport(currentViewport);
+
+      setIsExporting(false);
+    }
   }, [nodes]);
 
   return (
@@ -361,19 +377,32 @@ function App() {
                   <button
                     onClick={handleExportAsPng}
                     disabled={isExporting || nodes.length === 0}
-                    className="
+                    className={`
                       flex items-center gap-2 px-4 py-2 rounded-lg
-                      bg-purple-600 hover:bg-purple-700 active:bg-purple-800
                       text-white text-sm font-medium
                       disabled:opacity-50 disabled:cursor-not-allowed
-                      transition-colors shadow-lg border border-purple-700
-                    "
+                      transition-all shadow-lg border
+                      ${isExporting
+                        ? 'bg-purple-800 border-purple-900 cursor-wait'
+                        : 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800 border-purple-700'
+                      }
+                    `}
                     title="Download diagram as PNG"
                   >
-                    <Download className="w-4 h-4" />
-                    <span className={isExporting ? '' : 'hidden sm:inline'}>
-                      {isExporting ? 'Exporting...' : 'Download PNG'}
-                    </span>
+                    {isExporting ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span className="hidden sm:inline">Exporting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">Download PNG</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </Panel>

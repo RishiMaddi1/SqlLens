@@ -67,3 +67,20 @@
   background-color: #0f172a !important;
 }
 
+/* Export mode - hide all UI elements */
+body.exporting .react-flow__minimap,
+body.exporting .react-flow__controls,
+body.exporting .react-flow__panel {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Prevent any lingering shadows or borders during export */
+body.exporting .react-flow__minimap,
+body.exporting .react-flow__controls,
+body.exporting .react-flow__panel {
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+}
+
