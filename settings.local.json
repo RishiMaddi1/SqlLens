@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(where python:*)",
+      "Bash(where:*)",
+      "Bash(test:*)",
+      "Bash(\"C:\\\\Users\\\\maddi\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python311\\\\python.exe\":*)",
+      "Bash(tasklist:*)",
+      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\VideoLAN\\\\VLC\\\\vlc.exe\":*)",
+      "WebSearch",
+      "Bash(taskkill:*)",
+      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\VideoLAN\\\\VLC\\\\vlc.exe\":*])"
+    ]
+  }
+}
