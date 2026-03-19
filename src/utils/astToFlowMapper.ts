@@ -320,21 +320,25 @@ function processFromClause(
 
     // Find source from ON clause
     if (fromItem.on) {
-      function findTableInExpr(expr: any): string | null {
+      function findTableInExpr(expr: any, excludeTable: string): string | null {
         if (!expr) return null;
         if (expr.type === 'column_ref' && expr.table) {
-          return tableAliasMap.get(expr.table) || null;
+          const tableId = tableAliasMap.get(expr.table);
+          // Skip if this is the target table
+          if (tableId && tableId !== excludeTable) {
+            return tableId;
+          }
         }
         if (expr.left) {
-          const left = findTableInExpr(expr.left);
+          const left = findTableInExpr(expr.left, excludeTable);
           if (left) return left;
         }
         if (expr.right) {
-          return findTableInExpr(expr.right);
+          return findTableInExpr(expr.right, excludeTable);
         }
         return null;
       }
-      sourceId = findTableInExpr(fromItem.on);
+      sourceId = findTableInExpr(fromItem.on, targetId);
     }
 
     // Fallback: previous table
