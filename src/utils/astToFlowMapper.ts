@@ -133,11 +133,29 @@ function formatCondition(condition: any): string {
 function extractCTEDefinitions(ast: SelectAST): Map<string, { fields: string[]; internalAST: any }> {
   const cteMap = new Map<string, { fields: string[]; internalAST: any }>();
 
-  if (!ast.with || !ast.with.with) {
+  console.log('[DEBUG] ast.with:', JSON.stringify(ast.with, null, 2));
+
+  // Handle different AST structures for WITH clause:
+  // - Structure 1: ast.with = [{ name: {...}, stmt: {...} }]  (direct array)
+  // - Structure 2: ast.with = { with: [...] }  (nested object)
+  if (!ast.with) {
+    console.log('[DEBUG] No WITH clause found');
     return cteMap;
   }
 
-  const withClauses = Array.isArray(ast.with.with) ? ast.with.with : [ast.with.with];
+  let withClauses: any[];
+  if (Array.isArray(ast.with)) {
+    // Direct array structure
+    withClauses = ast.with;
+    console.log('[DEBUG] WITH clause is direct array, length:', withClauses.length);
+  } else if (ast.with.with && Array.isArray(ast.with.with)) {
+    // Nested object structure
+    withClauses = ast.with.with;
+    console.log('[DEBUG] WITH clause is nested object, length:', withClauses.length);
+  } else {
+    console.log('[DEBUG] WITH clause has unknown structure');
+    return cteMap;
+  }
 
   for (const withClause of withClauses) {
     if (!withClause) continue;
@@ -145,15 +163,27 @@ function extractCTEDefinitions(ast: SelectAST): Map<string, { fields: string[]; 
     let cteName = '';
     let cteStatement = null;
 
-    if (withClause.type === 'with') {
+    // Handle different AST structures for CTE definitions
+    // Structure 1: { name: { value: "name" }, stmt: { ... } }
+    if (withClause.name?.value) {
+      cteName = withClause.name.value;
+      cteStatement = withClause.stmt;
+    }
+    // Structure 2: { type: 'with', name: "name", statement: { ... } }
+    else if (withClause.type === 'with') {
       cteName = withClause.name || '';
       cteStatement = withClause.statement;
-    } else if (withClause.statement) {
-      cteName = withClause.as?.name || withClause.name || '';
-      cteStatement = withClause.statement;
+    }
+    // Structure 3: { name: "name", stmt: { ... } }
+    else if (withClause.stmt) {
+      cteName = withClause.name || withClause.as?.name || '';
+      cteStatement = withClause.stmt;
     }
 
-    if (!cteName || !cteStatement) continue;
+    if (!cteName || !cteStatement) {
+      console.log('[DEBUG] Skipping CTE clause, missing name or statement:', { cteName, hasStatement: !!cteStatement });
+      continue;
+    }
 
     // Extract CTE output fields
     let outputFields: string[] = [];
@@ -500,6 +530,7 @@ export function sqlToFlowNodes(
   // Extract CTE definitions
   const cteMap = extractCTEDefinitions(ast);
   const knownCTEs = new Set(cteMap.keys());
+  console.log(`[CTE FOUND] ${cteMap.size} CTE(s)`, Array.from(cteMap.keys()));
 
   // Extract WHERE filters
   const filtersByTable = extractWhereFilters(ast);
@@ -538,7 +569,7 @@ export function sqlToFlowNodes(
       id: nodeId,
       type: table.isCTE ? 'cteNode' : 'tableNode',
       data: {
-        tableName: table.name,
+        ...(table.isCTE ? { cteName: table.name } : { tableName: table.name }),
         alias: table.alias,
         fields: displayFields,
         filters: showFilters ? table.filters : [],
