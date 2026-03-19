@@ -5,6 +5,9 @@ https://sqllens.pages.dev/
 
 Instant SQL visualization — see your query structure at a glance. No data leaves your browser.
 
+<img width="2559" height="1306" alt="image" src="https://github.com/user-attachments/assets/20b2315a-1ce9-4315-b268-74b53a73540a" />
+
+
 ---
 
 A professional-grade, **100% client-side** SQL visualizer. It transforms complex SQL queries into interactive, hierarchical dependency graphs. No data ever leaves your browser—**no AI APIs, no backend, and no third-party tracking.**
