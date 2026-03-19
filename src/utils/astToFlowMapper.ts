@@ -237,10 +237,20 @@ function extractWhereFilters(ast: SelectAST): Map<string, string[]> {
 /**
  * Map SELECT columns to their source tables/CTEs
  */
-function mapColumnsToSources(ast: SelectAST, knownTables: Set<string>): Map<string, string[]> {
-  const columnMap = new Map<string, string[]>(); // source -> columns
+function mapColumnsToSources(
+  ast: SelectAST,
+  tableNameMap: Map<string, string> // lowercase -> canonical name
+): Map<string, string[]> {
+  const columnMap = new Map<string, string[]>(); // canonical source -> columns
 
   if (!ast.columns) return columnMap;
+
+  // Helper to get canonical table name (case-insensitive)
+  const getCanonicalName = (name: string): string | undefined => {
+    if (!name) return undefined;
+    const lowerKey = Array.from(tableNameMap.keys()).find(k => k.toLowerCase() === name.toLowerCase());
+    return lowerKey ? tableNameMap.get(lowerKey) : name; // fallback to original if not found
+  };
 
   for (const col of ast.columns) {
     if (!col.expr) continue;
@@ -252,11 +262,11 @@ function mapColumnsToSources(ast: SelectAST, knownTables: Set<string>): Map<stri
       sourceTable = col.expr.table;
       columnName = col.expr.column;
     } else if (col.expr.type === 'star') {
-      // * goes to all tables
+      // * goes to all tables (use canonical names)
       columnName = '*';
-      for (const table of knownTables) {
-        if (!columnMap.has(table)) columnMap.set(table, []);
-        columnMap.get(table)!.push('*');
+      for (const canonicalName of tableNameMap.values()) {
+        if (!columnMap.has(canonicalName)) columnMap.set(canonicalName, []);
+        columnMap.get(canonicalName)!.push('*');
       }
       continue;
     } else {
@@ -275,8 +285,12 @@ function mapColumnsToSources(ast: SelectAST, knownTables: Set<string>): Map<stri
     const displayName = col.as ? `${columnName} AS ${col.as}` : columnName;
 
     if (sourceTable) {
-      if (!columnMap.has(sourceTable)) columnMap.set(sourceTable, []);
-      columnMap.get(sourceTable)!.push(displayName);
+      // Convert to canonical name for storage
+      const canonicalTable = getCanonicalName(sourceTable);
+      if (canonicalTable) {
+        if (!columnMap.has(canonicalTable)) columnMap.set(canonicalTable, []);
+        columnMap.get(canonicalTable)!.push(displayName);
+      }
     }
   }
 
@@ -294,7 +308,14 @@ function processFromClause(
 ): { tables: TableNode[]; joins: JoinEdge[] } {
   const tables: TableNode[] = [];
   const joins: JoinEdge[] = [];
-  const tableAliasMap = new Map<string, string>(); // alias/real-name -> effective ID
+  const tableAliasMap = new Map<string, string>(); // lowercase alias/real-name -> effective ID
+
+  // Helper function for case-insensitive lookup in tableAliasMap
+  const getTableId = (name: string): string | undefined => {
+    if (!name) return undefined;
+    const lowerKey = Array.from(tableAliasMap.keys()).find(k => k.toLowerCase() === name.toLowerCase());
+    return lowerKey ? tableAliasMap.get(lowerKey) : undefined;
+  };
 
   if (!fromClause || !Array.isArray(fromClause)) {
     return { tables, joins };
@@ -317,18 +338,18 @@ function processFromClause(
       tableOrder.set(effectiveId, i);
     }
 
-    // Check if this is a CTE reference
-    const isCTE = knownCTEs.has(realTableName);
+    // Check if this is a CTE reference (case-insensitive)
+    const isCTE = Array.from(knownCTEs).some(cte => cte.toLowerCase() === realTableName.toLowerCase());
 
-    // Skip duplicate nodes (same effective ID already processed)
-    if (tableAliasMap.has(effectiveId)) {
+    // Skip duplicate nodes (same effective ID already processed) - case-insensitive check
+    if (getTableId(effectiveId)) {
       console.log(`[SKIP] Duplicate table reference: ${effectiveId}`);
       continue;
     }
 
-    tableAliasMap.set(effectiveId, effectiveId);
-    if (alias && alias !== realTableName) {
-      tableAliasMap.set(realTableName, effectiveId);
+    tableAliasMap.set(effectiveId.toLowerCase(), effectiveId);
+    if (alias && alias.toLowerCase() !== realTableName.toLowerCase()) {
+      tableAliasMap.set(realTableName.toLowerCase(), effectiveId);
     }
 
     const filters = filtersByTable.get(realTableName) || filtersByTable.get(alias || '') || [];
@@ -350,7 +371,7 @@ function processFromClause(
 
     if (!targetAlias) continue;
 
-    const targetId = tableAliasMap.get(targetAlias);
+    const targetId = getTableId(targetAlias);
     if (!targetId) continue;
 
     let sourceId: string | null = null;
@@ -366,10 +387,9 @@ function processFromClause(
         if (!expr) return;
         console.log(`[DEBUG] Checking expr type:`, expr.type, 'table:', expr.table);
         if (expr.type === 'column_ref' && expr.table) {
-          // Case-insensitive lookup in Map
-          const tableKey = Array.from(tableAliasMap.keys()).find(k => k.toLowerCase() === expr.table.toLowerCase());
-          console.log(`[DEBUG] Found table ref: ${expr.table}, lookup result:`, tableKey);
-          const tableId = tableKey ? tableAliasMap.get(tableKey) : null;
+          // Case-insensitive lookup using helper
+          const tableId = getTableId(expr.table);
+          console.log(`[DEBUG] Found table ref: ${expr.table}, lookup result:`, tableId);
           if (tableId && tableId !== targetId && !allTables.includes(tableId)) {
             allTables.push(tableId);
           }
@@ -394,7 +414,7 @@ function processFromClause(
       const prevItem = fromClause[i - 1];
       const prevAlias = extractAlias(prevItem) || extractTableName(prevItem);
       if (prevAlias) {
-        sourceId = tableAliasMap.get(prevAlias) || null;
+        sourceId = getTableId(prevAlias) || null;
       }
     }
 
@@ -556,14 +576,19 @@ export function sqlToFlowNodes(
   // Process FROM clause
   const { tables, joins } = processFromClause(ast.from, knownCTEs, filtersByTable);
 
-  // Map known tables
-  const knownTables = new Set<string>();
+  // Create a map of lowercase table names to canonical names for case-insensitive lookup
+  const tableNameMap = new Map<string, string>();
   for (const table of tables) {
-    knownTables.add(table.alias || table.name);
+    const canonicalName = table.alias || table.name;
+    tableNameMap.set(canonicalName.toLowerCase(), canonicalName);
+    // Also map the real name (if different from alias) to canonical
+    if (table.alias && table.alias !== table.name) {
+      tableNameMap.set(table.name.toLowerCase(), canonicalName);
+    }
   }
 
   // Map SELECT columns to their source tables
-  const columnMap = mapColumnsToSources(ast, knownTables);
+  const columnMap = mapColumnsToSources(ast, tableNameMap);
 
   // Build nodes
   const allNodes: Node[] = [];
