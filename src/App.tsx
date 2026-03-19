@@ -16,6 +16,7 @@ import './reactflow-custom.css';
 import { toPng } from 'html-to-image';
 import { Download, Columns3, SplitSquareHorizontal, Settings, BarChart3 } from 'lucide-react';
 import { sqlToFlowNodes } from './utils/astToFlowMapper';
+import { transpileOracleToPostgres } from './utils/oracleTranspiler';
 import { TableNode } from './nodes/TableNode';
 import { CTENode } from './nodes/CTENode';
 import { SubqueryNode } from './nodes/SubqueryNode';
@@ -273,7 +274,25 @@ const DEFAULT_QUERY = `WITH
       pp.category_rank ASC,
       item_profit DESC;`;
 
+// Available SQL dialects
+const SQL_DIALECTS = [
+  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'mariadb', label: 'MariaDB' },
+  { value: 'snowflake', label: 'Snowflake' },
+  { value: 'bigquery', label: 'BigQuery' },
+  { value: 'sqlite', label: 'SQLite' },
+  { value: 'transactsql', label: 'T-SQL' },
+  { value: 'oracle', label: 'Oracle (Beta)' },
+] as const;
+
 function App() {
+  // SQL dialect state with localStorage persistence
+  const [sqlDialect, setSqlDialect] = useState<typeof SQL_DIALECTS[number]['value']>(() => {
+    const saved = localStorage.getItem('sqllens-sql-dialect');
+    return (saved && SQL_DIALECTS.some(d => d.value === saved)) ? saved as any : 'postgresql';
+  });
+
   const [sql, setSql] = useState(DEFAULT_QUERY);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -301,6 +320,11 @@ function App() {
 
   // MiniMap toggle state
   const [showMiniMap, setShowMiniMap] = useState(true);
+
+  // Persist dialect preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('sqllens-sql-dialect', sqlDialect);
+  }, [sqlDialect]);
 
   // ReactFlow instance ref for fitView
   const reactFlowInstance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
@@ -343,8 +367,16 @@ function App() {
   const parseAndUpdateFlow = useCallback(() => {
     try {
       setError(null);
+
+      // For Oracle dialect, transpile to PostgreSQL-compatible SQL first
+      let sqlToParse = sql;
+      if (sqlDialect === 'oracle') {
+        sqlToParse = transpileOracleToPostgres(sql);
+        console.log('[ORACLE] Transpiled SQL:', sqlToParse);
+      }
+
       const { nodes: newNodes, edges: newEdges } = sqlToFlowNodes(
-        sql,
+        sqlToParse,
         edgeType,
         showFilters,
         rankSep,
@@ -366,19 +398,19 @@ function App() {
       setError(errorMessage);
       console.error('Parse error:', err);
     }
-  }, [sql, edgeType, showFilters, rankSep, nodeSep, fontSize, multiColorJoins, setNodes, setEdges]);
+  }, [sql, sqlDialect, edgeType, showFilters, rankSep, nodeSep, fontSize, multiColorJoins, setNodes, setEdges]);
 
   // Initial parse on mount
   useEffect(() => {
     parseAndUpdateFlow();
   }, []);
 
-  // Re-parse when layout settings change
+  // Re-parse when layout settings or dialect change
   useEffect(() => {
     if (nodes.length > 0) {
       parseAndUpdateFlow();
     }
-  }, [rankSep, nodeSep, edgeType, showFilters, fontSize, multiColorJoins]);
+  }, [rankSep, nodeSep, edgeType, showFilters, fontSize, multiColorJoins, sqlDialect]);
 
   const handleEditorChange = (value: string | undefined) => {
     const newSql = value || '';
@@ -528,6 +560,23 @@ function App() {
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
             <span className="text-sm font-medium text-slate-300">SQL Editor</span>
             <div className="flex items-center gap-2">
+              {/* SQL Dialect Selector */}
+              <select
+                value={sqlDialect}
+                onChange={(e) => setSqlDialect(e.target.value as typeof SQL_DIALECTS[number]['value'])}
+                className="px-2 py-1 text-xs rounded-md border bg-transparent cursor-pointer transition-colors hover:bg-[#161B22] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  borderColor: sqlDialect === 'oracle' ? '#f59e0b' : '#30363D',
+                  color: sqlDialect === 'oracle' ? '#f59e0b' : '#8B949E',
+                }}
+                title="Select SQL dialect"
+              >
+                {SQL_DIALECTS.map(dialect => (
+                  <option key={dialect.value} value={dialect.value} className="bg-[#0B0E14] text-slate-200">
+                    {dialect.label}
+                  </option>
+                ))}
+              </select>
               <span className="text-xs text-slate-500">node-sql-parser</span>
               <button
                 onClick={toggleEditor}
