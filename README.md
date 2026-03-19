@@ -1,5 +1,7 @@
 # SqlLens
 
+https://sqllens.pages.dev/
+
 
 Instant SQL visualization — see your query structure at a glance. No data leaves your browser.
 
