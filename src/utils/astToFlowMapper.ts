@@ -32,6 +32,7 @@ interface JoinEdge {
   from: string;
   to: string;
   type: string;
+  fields?: string[]; // Join field names like "CG.CLAIM_SEQ_ID = CP.CLAIM_SEQ_ID"
 }
 
 interface SelectAST {
@@ -375,6 +376,7 @@ function processFromClause(
     if (!targetId) continue;
 
     let sourceId: string | null = null;
+    const joinFields: string[] = []; // Extract join field names
 
     // Find source from ON clause - collect ALL tables, then pick the earliest one
     if (fromItem.on) {
@@ -386,14 +388,42 @@ function processFromClause(
       function findAllTablesInExpr(expr: any): void {
         if (!expr) return;
         console.log(`[DEBUG] Checking expr type:`, expr.type, 'table:', expr.table);
+
+        // Extract join fields from equality comparisons
+        if (expr.type === 'binary_expr' && expr.operator === '=') {
+          const leftCol = expr.left;
+          const rightCol = expr.right;
+
+          if (leftCol?.type === 'column_ref' && rightCol?.type === 'column_ref') {
+            // Both sides are column references - this is a join condition
+            const leftTable = getTableId(leftCol.table);
+            const rightTable = getTableId(rightCol.table);
+
+            // Only include if one side is our target table
+            if (leftTable === targetId || rightTable === targetId) {
+              const otherTable = leftTable === targetId ? rightTable : leftTable;
+              const targetField = leftTable === targetId ? leftCol.column : rightCol.column;
+              const otherField = leftTable === targetId ? rightCol.column : leftCol.column;
+
+              // Store as "other_table.field = target_table.field" (source first, then target)
+              joinFields.push(`${otherTable}.${otherField} = ${targetId}.${targetField}`);
+
+              // Track the other table for source detection
+              if (otherTable && otherTable !== targetId && !allTables.includes(otherTable)) {
+                allTables.push(otherTable);
+              }
+            }
+          }
+        }
+
+        // Also check for direct column references (for OR conditions, etc.)
         if (expr.type === 'column_ref' && expr.table) {
-          // Case-insensitive lookup using helper
           const tableId = getTableId(expr.table);
-          console.log(`[DEBUG] Found table ref: ${expr.table}, lookup result:`, tableId);
           if (tableId && tableId !== targetId && !allTables.includes(tableId)) {
             allTables.push(tableId);
           }
         }
+
         if (expr.left) findAllTablesInExpr(expr.left);
         if (expr.right) findAllTablesInExpr(expr.right);
       }
@@ -401,6 +431,7 @@ function processFromClause(
       findAllTablesInExpr(fromItem.on);
 
       console.log(`[DEBUG] Processing ${targetId}: found tables in ON clause:`, allTables);
+      console.log(`[DEBUG] Join fields:`, joinFields);
 
       // Pick the table that appears earliest in the query order (most established)
       if (allTables.length > 0) {
@@ -423,8 +454,9 @@ function processFromClause(
         from: sourceId,
         to: targetId,
         type: joinType,
+        fields: joinFields.length > 0 ? joinFields : undefined,
       });
-      console.log(`[JOIN] ${sourceId} --[${joinType}]--> ${targetId}`);
+      console.log(`[JOIN] ${sourceId} --[${joinType}]--> ${targetId}`, joinFields.length > 0 ? `on ${joinFields.join(', ')}` : '');
     }
   }
 
@@ -590,6 +622,14 @@ export function sqlToFlowNodes(
   // Map SELECT columns to their source tables
   const columnMap = mapColumnsToSources(ast, tableNameMap);
 
+  // Create a map of join fields for each table (target table -> join fields)
+  const joinFieldsMap = new Map<string, string[]>();
+  for (const join of joins) {
+    if (join.fields && join.fields.length > 0) {
+      joinFieldsMap.set(join.to, join.fields);
+    }
+  }
+
   // Build nodes
   const allNodes: Node[] = [];
   const nodeIdMap = new Map<string, string>();
@@ -598,6 +638,7 @@ export function sqlToFlowNodes(
     // Use alias as ID if exists, otherwise use table name
     const nodeId = table.alias || table.name;
     const fields = columnMap.get(nodeId) || [];
+    const joinFields = joinFieldsMap.get(nodeId) || [];
 
     // If this is a CTE, also include its output fields
     let displayFields = fields;
@@ -616,6 +657,7 @@ export function sqlToFlowNodes(
         alias: table.alias,
         fields: displayFields,
         filters: showFilters ? table.filters : [],
+        joinFields: joinFields, // Add join fields to node data
         fontSize: fontSize,
         nodeColor: table.isCTE ? '#06b6d4' : '#10b981', // cyan or emerald
       },

@@ -7,6 +7,7 @@ interface TableNodeData {
   alias?: string;
   fields: string[];
   filters?: string[];
+  joinFields?: string[];
   fontSize?: number;
 }
 
@@ -14,6 +15,7 @@ export const TableNode = memo((props: NodeProps) => {
   const data = props.data as unknown as TableNodeData;
   const fontSize = data.fontSize || 14;
   const hasFilters = data.filters && data.filters.length > 0;
+  const hasJoinFields = data.joinFields && data.joinFields.length > 0;
   const hasAlias = data.alias && data.alias !== data.tableName;
   const needsScroll = data.fields.length > 12 || (data.filters?.length || 0) > 8;
 
@@ -83,6 +85,24 @@ export const TableNode = memo((props: NodeProps) => {
           )}
         </div>
       </div>
+
+      {/* Join Fields Section */}
+      {hasJoinFields && (
+        <div className="px-3 py-2 border-b border-[#30363D]" style={{ background: 'rgba(99, 102, 241, 0.08)' }}>
+          <div className="space-y-1">
+            {data.joinFields!.map((joinField: string, index: number) => (
+              <code
+                key={index}
+                className="block text-indigo-300/90 font-mono bg-[#0D1117]/50 px-2 py-1 rounded truncate"
+                style={{ fontSize: `${fontSize - 3}px` }}
+                title={joinField}
+              >
+                {joinField}
+              </code>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Fields List - Scrollable if needed */}
       <div className="px-4 py-3">
