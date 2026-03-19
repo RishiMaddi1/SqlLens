@@ -583,7 +583,7 @@ export function sqlToFlowNodes(
       type: edgeType,
       animated: false,
       style: { stroke: edgeColor, strokeWidth: 1.5 },
-      labelStyle: { fill: '#64748b', fontSize: 11 },
+      labelStyle: { fill: '#000000', fontSize: 11, fontWeight: 'bold' },
       labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: '#e2e8f0', strokeWidth: 1 },
     });
 
@@ -616,7 +616,7 @@ export function sqlToFlowNodes(
         animated: false,
         style: { stroke: '#a855f7', strokeWidth: 1.5 },
         label: 'ORDER BY',
-        labelStyle: { fill: '#7c3aed', fontSize: 10 },
+        labelStyle: { fill: '#000000', fontSize: 10, fontWeight: 'bold' },
         labelBgStyle: { fill: '#ffffff', fillOpacity: 0.95, stroke: '#e9d5ff', strokeWidth: 1 },
       });
       console.log(`[ORDER BY] Connected to ${finalTableId}`);
