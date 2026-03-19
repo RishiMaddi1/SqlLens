@@ -350,7 +350,7 @@ function App() {
                   },
                 });
               }}
-              onMount={(editor, monaco) => {
+              onMount={(_editor, monaco) => {
                 monaco.editor.setTheme('deep-slate');
               }}
               options={{
