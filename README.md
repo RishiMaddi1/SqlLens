@@ -1,4 +1,4 @@
-# QueryScan
+# SqlLex
 
 
 Instant SQL visualization — see your query structure at a glance. No data leaves your browser.
@@ -375,8 +375,8 @@ WITH
 
 ### 1. Installation
 ```bash
-git clone https://github.com/YOUR_USERNAME/queryscan.git
-cd queryscan
+git clone https://github.com/YOUR_USERNAME/SqlLex.git
+cd SqlLex
 npm install
 ```
 
