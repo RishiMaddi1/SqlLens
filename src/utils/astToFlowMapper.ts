@@ -300,7 +300,9 @@ function processFromClause(
     return { tables, joins };
   }
 
-  // First pass: create table nodes
+  // First pass: create table nodes and track their order
+  const tableOrder = new Map<string, number>(); // Track order of appearance
+
   for (let i = 0; i < fromClause.length; i++) {
     const fromItem = fromClause[i];
     const realTableName = extractTableName(fromItem);
@@ -309,6 +311,11 @@ function processFromClause(
     if (!realTableName) continue;
 
     const effectiveId = alias || realTableName;
+
+    // Track the order this table appears
+    if (!tableOrder.has(effectiveId)) {
+      tableOrder.set(effectiveId, i);
+    }
 
     // Check if this is a CTE reference
     const isCTE = knownCTEs.has(realTableName);
@@ -348,27 +355,38 @@ function processFromClause(
 
     let sourceId: string | null = null;
 
-    // Find source from ON clause
+    // Find source from ON clause - collect ALL tables, then pick the earliest one
     if (fromItem.on) {
-      function findTableInExpr(expr: any, excludeTable: string): string | null {
-        if (!expr) return null;
+      console.log(`[DEBUG] ON clause for ${targetId}:`, JSON.stringify(fromItem.on, null, 2));
+      console.log(`[DEBUG] tableAliasMap entries:`, Array.from(tableAliasMap.entries()));
+
+      const allTables: string[] = [];
+
+      function findAllTablesInExpr(expr: any): void {
+        if (!expr) return;
+        console.log(`[DEBUG] Checking expr type:`, expr.type, 'table:', expr.table);
         if (expr.type === 'column_ref' && expr.table) {
-          const tableId = tableAliasMap.get(expr.table);
-          // Skip if this is the target table
-          if (tableId && tableId !== excludeTable) {
-            return tableId;
+          // Case-insensitive lookup in Map
+          const tableKey = Array.from(tableAliasMap.keys()).find(k => k.toLowerCase() === expr.table.toLowerCase());
+          console.log(`[DEBUG] Found table ref: ${expr.table}, lookup result:`, tableKey);
+          const tableId = tableKey ? tableAliasMap.get(tableKey) : null;
+          if (tableId && tableId !== targetId && !allTables.includes(tableId)) {
+            allTables.push(tableId);
           }
         }
-        if (expr.left) {
-          const left = findTableInExpr(expr.left, excludeTable);
-          if (left) return left;
-        }
-        if (expr.right) {
-          return findTableInExpr(expr.right, excludeTable);
-        }
-        return null;
+        if (expr.left) findAllTablesInExpr(expr.left);
+        if (expr.right) findAllTablesInExpr(expr.right);
       }
-      sourceId = findTableInExpr(fromItem.on, targetId);
+
+      findAllTablesInExpr(fromItem.on);
+
+      console.log(`[DEBUG] Processing ${targetId}: found tables in ON clause:`, allTables);
+
+      // Pick the table that appears earliest in the query order (most established)
+      if (allTables.length > 0) {
+        allTables.sort((a, b) => (tableOrder.get(a) || Infinity) - (tableOrder.get(b) || Infinity));
+        sourceId = allTables[0];
+      }
     }
 
     // Fallback: previous table

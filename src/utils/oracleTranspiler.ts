@@ -172,7 +172,7 @@ export function transpileOracleToPostgres(sql: string): string {
   // 10. Handle ROWNUM properly in WHERE clause
   // WHERE ROWNUM <= n -> LIMIT n (but this is tricky, we'll just remove ROWNUM references)
   // First, handle WHERE ROWNUM <= n pattern
-  result = result.replace(/WHERE\s+.*?\s+ROWNUM\s*<=\s*(\d+)/gi, (match, limit) => {
+  result = result.replace(/WHERE\s+.*?\s+ROWNUM\s*<=\s*(\d+)/gi, (match, _limit) => {
     // Remove ROWNUM condition but keep the rest
     return match.replace(/\s+AND\s+ROWNUM\s*<=\s*\d+/gi, '').replace(/ROWNUM\s*<=\s*\d+/gi, '');
   });
