@@ -349,7 +349,6 @@ function App() {
       const tableName = data.tableName?.toLowerCase() || '';
       const alias = data.alias?.toLowerCase() || '';
       const cteName = data.cteName?.toLowerCase() || '';
-      const displayName = alias || tableName || cteName;
 
       const matches = tableName.startsWith(query) ||
                      alias.startsWith(query) ||
