@@ -351,8 +351,9 @@ function App() {
       const cteName = data.cteName?.toLowerCase() || '';
       const displayName = alias || tableName || cteName;
 
-      const matches = displayName.includes(query) ||
-                     data.fields?.some((f: string) => f.toLowerCase().includes(query));
+      const matches = tableName.startsWith(query) ||
+                     alias.startsWith(query) ||
+                     cteName.startsWith(query);
 
       return {
         ...node,
@@ -648,8 +649,25 @@ function App() {
           }`}
           style={{ background: '#0B0E14' }}
         >
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
+          <div className="flex items-center justify-between px-4 py-3 gap-4" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
             <span className="text-sm font-medium text-slate-300">Flow Visualization</span>
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <div className="relative w-full">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search table names..."
+                  className="w-full pl-10 pr-3 py-2 text-sm bg-[#161B22] border border-[#30363D] rounded-lg
+                    text-slate-300 placeholder:text-slate-500
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  "
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">dagre auto-layout</span>
               <button
