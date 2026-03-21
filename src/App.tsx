@@ -23,6 +23,10 @@ import { SubqueryNode } from './nodes/SubqueryNode';
 import { SortNode } from './nodes/SortNode';
 import { SettingsSidebar } from './components/SettingsSidebar';
 import { ScanSummary } from './components/ScanSummary';
+import { filterNodes } from './utils/filterNodes';
+
+/** Delay before pan/zoom to search matches while typing (dimming is immediate). */
+const SEARCH_FIT_VIEW_DEBOUNCE_MS = 100;
 
 // Default hardcoded query for the PoC
 const DEFAULT_QUERY = `WITH
@@ -330,38 +334,84 @@ function App() {
   const reactFlowInstance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
 
   // Register custom node types
-  const nodeTypes = {
-    tableNode: TableNode,
-    cteNode: CTENode,
-    subqueryNode: SubqueryNode,
-    sortNode: SortNode,
-  } as any; // TypeScript workaround for node type registration
+  const nodeTypes = useMemo(
+    () =>
+      ({
+        tableNode: TableNode,
+        cteNode: CTENode,
+        subqueryNode: SubqueryNode,
+        sortNode: SortNode,
+      }) as any,
+    []
+  );
 
-  // Filter nodes based on search query
-  const filteredNodes = useMemo(() => {
+  // Nodes that match the current search (derived; no setState during render)
+  const matchedSubset = useMemo(
+    () =>
+      searchQuery.trim()
+        ? filterNodes(searchQuery, nodes, true)
+        : [],
+    [nodes, searchQuery]
+  );
+
+  // Dim non-matching nodes when there is a query and at least one match
+  const filteredNodes = useMemo((): Node[] => {
     if (!searchQuery.trim()) {
       return nodes;
     }
 
-    const query = searchQuery.toLowerCase();
+    const matchedIds = new Set(matchedSubset.map((n) => n.id));
+    if (matchedIds.size === 0) {
+      return nodes;
+    }
+
     return nodes.map((node) => {
-      const data = node.data as any;
-      const tableName = data.tableName?.toLowerCase() || '';
-      const alias = data.alias?.toLowerCase() || '';
-      const cteName = data.cteName?.toLowerCase() || '';
-
-      const matches = tableName.startsWith(query) ||
-                     alias.startsWith(query) ||
-                     cteName.startsWith(query);
-
-      return {
-        ...node,
-        style: matches
-          ? node.style
-          : { ...node.style, opacity: 0.3 },
-      };
+      if (!matchedIds.has(node.id)) {
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            opacity: 0.3,
+          },
+        };
+      }
+      return node;
     });
-  }, [nodes, searchQuery]);
+  }, [nodes, searchQuery, matchedSubset]);
+
+  // Pan/zoom: full graph when query cleared (immediate); debounced while typing — zoom to matches, or full graph if none
+  useEffect(() => {
+    const instance = reactFlowInstance.current;
+    if (!instance) return;
+
+    const q = searchQuery.trim();
+    if (!q) {
+      instance.fitView({ padding: 0.2, duration: 300 });
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const inst = reactFlowInstance.current;
+      if (!inst) return;
+      if (!searchQuery.trim()) {
+        inst.fitView({ padding: 0.2, duration: 300 });
+        return;
+      }
+      if (matchedSubset.length === 0) {
+        inst.fitView({ padding: 0.2, duration: 300 });
+        return;
+      }
+      inst.fitView({
+        nodes: matchedSubset.map((node) => ({ id: node.id })),
+        padding: 0.2,
+        duration: 300,
+        minZoom: 0.5,
+        maxZoom: 1.5,
+      });
+    }, SEARCH_FIT_VIEW_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, matchedSubset]);
 
   // Parse SQL and update flow (only triggered by button click)
   const parseAndUpdateFlow = useCallback(() => {
@@ -552,9 +602,8 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Monaco Editor */}
         <div
-          className={`flex flex-col transition-all duration-300 ${
-            expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-[40%]'
-          }`}
+          className={`flex flex-col transition-all duration-300 ${expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-[40%]'
+            }`}
           style={{ borderRight: '1px solid #30363D' }}
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
@@ -643,9 +692,8 @@ function App() {
 
         {/* Right Pane: React Flow Canvas */}
         <div
-          className={`flex flex-col transition-all duration-300 ${
-            expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-[60%]'
-          }`}
+          className={`flex flex-col transition-all duration-300 ${expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-[60%]'
+            }`}
           style={{ background: '#0B0E14' }}
         >
           <div className="flex items-center justify-between px-4 py-3 gap-4" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
