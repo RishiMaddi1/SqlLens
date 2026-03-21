@@ -23,6 +23,7 @@ import { SubqueryNode } from './nodes/SubqueryNode';
 import { SortNode } from './nodes/SortNode';
 import { SettingsSidebar } from './components/SettingsSidebar';
 import { ScanSummary } from './components/ScanSummary';
+import { filterNodes } from './utils/filterNodes';
 
 // Default hardcoded query for the PoC
 const DEFAULT_QUERY = `WITH
@@ -338,29 +339,30 @@ function App() {
   } as any; // TypeScript workaround for node type registration
 
   // Filter nodes based on search query
-  const filteredNodes = useMemo(() => {
-    if (!searchQuery.trim()) {
+  const filteredNodes = useMemo((): Node[] => {
+    if (searchQuery.trim() == '') {
       return nodes;
     }
 
-    const query = searchQuery.toLowerCase();
-    return nodes.map((node) => {
-      const data = node.data as any;
-      const tableName = data.tableName?.toLowerCase() || '';
-      const alias = data.alias?.toLowerCase() || '';
-      const cteName = data.cteName?.toLowerCase() || '';
+    const matchedNodes = filterNodes(searchQuery, nodes, true);
+    const matchedSet = new Set();
+    matchedNodes.map(matchedNode => {
+      matchedSet.add(matchedNode);
+    })
 
-      const matches = tableName.startsWith(query) ||
-                     alias.startsWith(query) ||
-                     cteName.startsWith(query);
+    return nodes.map(node => {
+      if (!matchedSet.has(node)) {
+        return {
+          ...node,
+          style: {
+            ...node.style, opacity: 0.3
+          }
+        }
+      }
 
-      return {
-        ...node,
-        style: matches
-          ? node.style
-          : { ...node.style, opacity: 0.3 },
-      };
-    });
+      return node;
+    })
+
   }, [nodes, searchQuery]);
 
   // Parse SQL and update flow (only triggered by button click)
@@ -552,9 +554,8 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Pane: Monaco Editor */}
         <div
-          className={`flex flex-col transition-all duration-300 ${
-            expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-[40%]'
-          }`}
+          className={`flex flex-col transition-all duration-300 ${expandedPane === 'editor' ? 'w-full' : expandedPane === 'viz' ? 'w-0 hidden' : 'w-[40%]'
+            }`}
           style={{ borderRight: '1px solid #30363D' }}
         >
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
@@ -643,9 +644,8 @@ function App() {
 
         {/* Right Pane: React Flow Canvas */}
         <div
-          className={`flex flex-col transition-all duration-300 ${
-            expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-[60%]'
-          }`}
+          className={`flex flex-col transition-all duration-300 ${expandedPane === 'viz' ? 'w-full' : expandedPane === 'editor' ? 'w-0 hidden' : 'w-[60%]'
+            }`}
           style={{ background: '#0B0E14' }}
         >
           <div className="flex items-center justify-between px-4 py-3 gap-4" style={{ borderBottom: '1px solid #30363D', background: '#0B0E14' }}>
